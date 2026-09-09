@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using VehicleService.Domain.Entities;
 using VehicleService.Domain.Enums;
@@ -14,6 +14,31 @@ public static class DbInitializer
         RoleManager<ApplicationRole> roleManager)
     {
         await context.Database.EnsureCreatedAsync();
+
+        // Ensure IsActive column exists in Vehicles table for existing databases
+        if (context.Database.IsSqlite())
+        {
+            try
+            {
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE Vehicles ADD COLUMN IsActive INTEGER NOT NULL DEFAULT 1;");
+            }
+            catch { /* Column may already exist */ }
+        }
+        else if (context.Database.IsSqlServer())
+        {
+            try
+            {
+                await context.Database.ExecuteSqlRawAsync(@"
+                    IF NOT EXISTS (
+                        SELECT * FROM sys.columns 
+                        WHERE object_id = OBJECT_ID('Vehicles') AND name = 'IsActive'
+                    )
+                    BEGIN
+                        ALTER TABLE Vehicles ADD IsActive bit NOT NULL CONSTRAINT DF_Vehicles_IsActive DEFAULT 1;
+                    END");
+            }
+            catch { /* Column may already exist */ }
+        }
 
         // 1. Seed Roles
         var roles = Enum.GetValues<UserRoleType>().Select(r => r.ToString()).ToList();

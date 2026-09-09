@@ -1,0 +1,138 @@
+@model CreateVehicleDto
+@{
+    ViewData["Title"] = $"Edit Vehicle - {ViewBag.RegistrationNumber}";
+    int vehicleId = ViewBag.VehicleId ?? 0;
+}
+
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card p-4 shadow border-0">
+                <div class="d-flex align-items-center justify-content-between mb-4 pb-2 border-bottom">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="stat-icon primary"><i class="bi bi-pencil-square"></i></div>
+                        <div>
+                            <h3 class="fw-bold mb-0">Edit Vehicle Details</h3>
+                            <p class="text-muted small mb-0">Update specifications, mileage, insurance, or active status</p>
+                        </div>
+                    </div>
+                    <span class="badge bg-dark font-monospace fs-6">@ViewBag.RegistrationNumber</span>
+                </div>
+
+                <div asp-validation-summary="All" class="text-danger small mb-3"></div>
+
+                <form asp-action="EditVehicle" asp-route-id="@vehicleId" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="CustomerId" />
+
+                    <!-- Status Banner / Toggle -->
+                    <div class="card bg-light border-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="fw-bold mb-1"><i class="bi bi-power text-primary me-1"></i> Vehicle Operational Status</h6>
+                                <p class="text-muted small mb-0">
+                                    Active vehicles can be booked for service appointments and receive maintenance reminders.
+                                </p>
+                            </div>
+                            <div class="form-check form-switch fs-5">
+                                <input asp-for="IsActive" class="form-check-input cursor-pointer" type="checkbox" role="switch" id="isActiveSwitch" />
+                                <label class="form-check-label fs-6 fw-semibold ms-1" for="isActiveSwitch">
+                                    @(Model.IsActive ? "Active" : "Inactive")
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- Read-only Identifiers -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Registration / License Plate</label>
+                            <input class="form-control font-monospace bg-light" value="@Model.RegistrationNumber" readonly />
+                            <small class="text-muted">License plate numbers cannot be altered directly.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Vehicle Identification Number (VIN)</label>
+                            <input class="form-control font-monospace bg-light" value="@Model.VIN" readonly />
+                            <small class="text-muted">Unique 17-character chassis number.</small>
+                        </div>
+
+                        <!-- Core Specs -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Make / Brand *</label>
+                            <input asp-for="Make" class="form-control" placeholder="e.g. Hyundai, Toyota, Tata" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Model *</label>
+                            <input asp-for="Model" class="form-control" placeholder="e.g. Creta, Innova, Nexon" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Variant / Trim</label>
+                            <input asp-for="Variant" class="form-control" placeholder="e.g. SX (O), ZX" />
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Manufacturing Year</label>
+                            <input asp-for="ManufacturingYear" type="number" class="form-control" min="1990" max="@(DateTime.UtcNow.Year + 1)" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Color</label>
+                            <input asp-for="Color" class="form-control" placeholder="e.g. White, Grey, Black" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Current Mileage (KM) *</label>
+                            <input asp-for="CurrentMileage" type="number" class="form-control" min="0" required />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Fuel Type</label>
+                            <select asp-for="FuelType" class="form-select" asp-items="Html.GetEnumSelectList<VehicleFuelType>()"></select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Transmission</label>
+                            <select asp-for="Transmission" class="form-select" asp-items="Html.GetEnumSelectList<TransmissionType>()"></select>
+                        </div>
+
+                        <!-- Insurance Details -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Insurance Provider</label>
+                            <input asp-for="InsuranceProvider" class="form-control" placeholder="e.g. HDFC ERGO, ICICI Lombard" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Policy Number</label>
+                            <input asp-for="InsurancePolicyNumber" class="form-control" placeholder="POL-123456" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Insurance Expiry Date</label>
+                            <input asp-for="InsuranceExpiryDate" type="date" class="form-control" value="@(Model.InsuranceExpiryDate?.ToString("yyyy-MM-dd"))" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                        <a asp-action="Index" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to Garage
+                        </a>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary px-4">
+                                <i class="bi bi-check-circle"></i> Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const switchEl = document.getElementById('isActiveSwitch');
+        if (switchEl) {
+            switchEl.addEventListener('change', function () {
+                const label = this.nextElementSibling;
+                if (label) {
+                    label.textContent = this.checked ? 'Active' : 'Inactive';
+                }
+            });
+        }
+    });
+</script>

@@ -1,4 +1,4 @@
-﻿@model IReadOnlyList<VehicleDto>
+@model IReadOnlyList<VehicleDto>
 @{
     ViewData["Title"] = "My Garage";
     var activeJobs = ViewBag.ActiveJobs as List<AppointmentDto> ?? new List<AppointmentDto>();
@@ -49,14 +49,30 @@
             @foreach (var v in Model)
             {
                 <div class="col-md-6 col-lg-4">
-                    <div class="card h-100 border-0 shadow-sm p-3">
+                    <div class="card h-100 border-0 shadow-sm p-3 @(!v.IsActive ? "opacity-75 bg-light" : "")">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <div>
-                                <span class="badge bg-dark font-monospace fs-6">@v.RegistrationNumber</span>
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <span class="badge bg-dark font-monospace fs-6">@v.RegistrationNumber</span>
+                                    @if (v.IsActive)
+                                    {
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                                            <i class="bi bi-check-circle-fill me-1"></i> Active
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1">
+                                            <i class="bi bi-pause-circle-fill me-1"></i> Inactive
+                                        </span>
+                                    }
+                                </div>
                                 <h5 class="fw-bold mt-2 mb-0">@v.Make @v.Model</h5>
                                 <span class="text-muted small">@v.Variant (@v.ManufacturingYear)</span>
                             </div>
-                            <div class="stat-icon primary p-2 rounded-circle"><i class="bi bi-car-front-fill"></i></div>
+                            <div class="stat-icon @(v.IsActive ? "primary" : "secondary") p-2 rounded-circle">
+                                <i class="bi bi-car-front-fill"></i>
+                            </div>
                         </div>
 
                         <hr class="my-2 border-light">
@@ -68,21 +84,55 @@
                         </div>
 
                         <!-- Maintenance Due Indicator -->
-                        @if (v.IsMaintenanceDue)
+                        @if (v.IsMaintenanceDue && v.IsActive)
                         {
                             <div class="alert alert-warning py-1 px-2 small mt-2 mb-0 d-flex align-items-center gap-2">
                                 <i class="bi bi-exclamation-triangle-fill text-warning"></i>
                                 <span><strong>Maintenance Due!</strong> Target: @v.NextServiceDueMileage.ToString("N0") KM</span>
                             </div>
                         }
+                        else if (!v.IsActive)
+                        {
+                            <div class="alert alert-secondary py-1 px-2 small mt-2 mb-0 d-flex align-items-center gap-2">
+                                <i class="bi bi-info-circle"></i>
+                                <span>Vehicle is marked <strong>Inactive</strong>.</span>
+                            </div>
+                        }
 
-                        <div class="d-flex gap-2 mt-3 pt-2 border-top">
-                            <a asp-action="BookService" asp-route-vehicleId="@v.Id" class="btn btn-primary btn-sm flex-fill">
-                                <i class="bi bi-calendar-check"></i> Book Service
+                        <div class="d-flex flex-wrap gap-2 mt-3 pt-2 border-top">
+                            @if (v.IsActive)
+                            {
+                                <a asp-action="BookService" asp-route-vehicleId="@v.Id" class="btn btn-primary btn-sm flex-fill">
+                                    <i class="bi bi-calendar-check"></i> Book Service
+                                </a>
+                            }
+                            else
+                            {
+                                <button class="btn btn-secondary btn-sm flex-fill" disabled title="Activate vehicle to book service">
+                                    <i class="bi bi-slash-circle"></i> Inactive
+                                </button>
+                            }
+                            <a asp-action="EditVehicle" asp-route-id="@v.Id" class="btn btn-outline-primary btn-sm" title="Edit Vehicle Details">
+                                <i class="bi bi-pencil-square"></i> Edit
                             </a>
                             <a asp-action="ServiceHistory" asp-route-vehicleId="@v.Id" class="btn btn-outline-secondary btn-sm" title="View Service History">
                                 <i class="bi bi-clock-history"></i> History
                             </a>
+                            <form asp-action="ToggleVehicleStatus" asp-route-id="@v.Id" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                @if (v.IsActive)
+                                {
+                                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Deactivate Vehicle" onclick="return confirm('Deactivate @v.Make @v.Model? Inactive vehicles will not appear in service booking.');">
+                                        <i class="bi bi-pause-circle"></i>
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button type="submit" class="btn btn-outline-success btn-sm" title="Activate Vehicle">
+                                        <i class="bi bi-play-circle"></i>
+                                    </button>
+                                }
+                            </form>
                         </div>
                     </div>
                 </div>

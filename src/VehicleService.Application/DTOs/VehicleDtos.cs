@@ -1,4 +1,4 @@
-﻿using VehicleService.Domain.Enums;
+using VehicleService.Domain.Enums;
 
 namespace VehicleService.Application.DTOs;
 
@@ -15,6 +15,7 @@ public class VehicleDto
     public VehicleFuelType FuelType { get; set; }
     public TransmissionType Transmission { get; set; }
     public int CurrentMileage { get; set; }
+    public bool IsActive { get; set; } = true;
     
     public string? InsuranceProvider { get; set; }
     public string? InsurancePolicyNumber { get; set; }
@@ -47,6 +48,7 @@ public class CreateVehicleDto
     public VehicleFuelType FuelType { get; set; } = VehicleFuelType.Petrol;
     public TransmissionType Transmission { get; set; } = TransmissionType.Automatic;
     public int CurrentMileage { get; set; }
+    public bool IsActive { get; set; } = true;
     public string? InsuranceProvider { get; set; }
     public string? InsurancePolicyNumber { get; set; }
     public DateTime? InsuranceExpiryDate { get; set; }

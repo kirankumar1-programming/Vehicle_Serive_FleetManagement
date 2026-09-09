@@ -1,4 +1,4 @@
-﻿using VehicleService.Application.DTOs;
+using VehicleService.Application.DTOs;
 using VehicleService.Domain.Entities;
 using VehicleService.Domain.Enums;
 
@@ -13,6 +13,7 @@ public interface IVehicleService
     Task<VehicleDto?> GetVehicleByRegistrationAsync(string regNumber);
     Task<VehicleDto> RegisterVehicleAsync(CreateVehicleDto dto);
     Task UpdateVehicleAsync(int id, CreateVehicleDto dto);
+    Task ToggleVehicleStatusAsync(int vehicleId);
     Task UpdateMileageAsync(int vehicleId, int newMileage);
     Task AssignDriverAsync(DriverAssignmentDto dto);
 }

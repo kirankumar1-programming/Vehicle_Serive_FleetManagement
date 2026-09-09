@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -70,7 +70,7 @@ public class CustomerController : Controller
     [HttpGet]
     public IActionResult AddVehicle()
     {
-        return View(new CreateVehicleDto { CustomerId = CurrentUserId });
+        return View(new CreateVehicleDto { CustomerId = CurrentUserId, IsActive = true });
     }
 
     [HttpPost]
@@ -91,16 +91,102 @@ public class CustomerController : Controller
         }
     }
 
+    // Edit Vehicle
+    [HttpGet]
+    public async Task<IActionResult> EditVehicle(int id)
+    {
+        var vehicle = await _vehicleService.GetVehicleByIdAsync(id);
+        if (vehicle == null || vehicle.CustomerId != CurrentUserId)
+        {
+            TempData["ErrorMessage"] = "Vehicle not found or access denied.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var dto = new CreateVehicleDto
+        {
+            RegistrationNumber = vehicle.RegistrationNumber,
+            VIN = vehicle.VIN,
+            Make = vehicle.Make,
+            Model = vehicle.Model,
+            Variant = vehicle.Variant,
+            ManufacturingYear = vehicle.ManufacturingYear,
+            Color = vehicle.Color,
+            FuelType = vehicle.FuelType,
+            Transmission = vehicle.Transmission,
+            CurrentMileage = vehicle.CurrentMileage,
+            InsuranceProvider = vehicle.InsuranceProvider,
+            InsurancePolicyNumber = vehicle.InsurancePolicyNumber,
+            InsuranceExpiryDate = vehicle.InsuranceExpiryDate,
+            CustomerId = vehicle.CustomerId,
+            IsActive = vehicle.IsActive
+        };
+
+        ViewBag.VehicleId = id;
+        ViewBag.RegistrationNumber = vehicle.RegistrationNumber;
+        ViewBag.IsActive = vehicle.IsActive;
+        return View(dto);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditVehicle(int id, CreateVehicleDto dto)
+    {
+        var vehicle = await _vehicleService.GetVehicleByIdAsync(id);
+        if (vehicle == null || vehicle.CustomerId != CurrentUserId)
+        {
+            TempData["ErrorMessage"] = "Vehicle not found or access denied.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        dto.CustomerId = CurrentUserId;
+        dto.RegistrationNumber = vehicle.RegistrationNumber; // Keep registration unchanged
+        dto.VIN = vehicle.VIN;
+
+        try
+        {
+            await _vehicleService.UpdateVehicleAsync(id, dto);
+            TempData["SuccessMessage"] = $"Vehicle {dto.Make} {dto.Model} ({vehicle.RegistrationNumber}) updated successfully!";
+            return RedirectToAction(nameof(Index));
+        }
+        catch (Exception ex)
+        {
+            ModelState.AddModelError("", ex.Message);
+            ViewBag.VehicleId = id;
+            ViewBag.RegistrationNumber = vehicle.RegistrationNumber;
+            ViewBag.IsActive = dto.IsActive;
+            return View(dto);
+        }
+    }
+
+    // Toggle Active/Inactive Status
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ToggleVehicleStatus(int id)
+    {
+        var vehicle = await _vehicleService.GetVehicleByIdAsync(id);
+        if (vehicle == null || vehicle.CustomerId != CurrentUserId)
+        {
+            TempData["ErrorMessage"] = "Vehicle not found or access denied.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        await _vehicleService.ToggleVehicleStatusAsync(id);
+        var newStatus = !vehicle.IsActive ? "Active" : "Inactive";
+        TempData["SuccessMessage"] = $"Vehicle {vehicle.Make} {vehicle.Model} ({vehicle.RegistrationNumber}) is now {newStatus}.";
+        return RedirectToAction(nameof(Index));
+    }
+
     // 2. Book Service Appointment Wizard
     [HttpGet]
     public async Task<IActionResult> BookService(int? vehicleId = null)
     {
         var vehicles = await _vehicleService.GetCustomerVehiclesAsync(CurrentUserId);
+        var activeVehicles = vehicles.Where(v => v.IsActive).ToList();
         var serviceTypes = await _unitOfWork.Repository<ServiceType>().FindAsync(s => s.IsActive);
         var servicePackages = await _unitOfWork.Repository<ServicePackage>().FindAsync(p => p.IsActive);
         var serviceCenters = await _unitOfWork.Repository<ServiceCenter>().FindAsync(c => c.IsActive);
 
-        ViewBag.Vehicles = vehicles;
+        ViewBag.Vehicles = activeVehicles;
         ViewBag.ServiceTypes = serviceTypes;
         ViewBag.ServicePackages = servicePackages;
         ViewBag.ServiceCenters = serviceCenters;

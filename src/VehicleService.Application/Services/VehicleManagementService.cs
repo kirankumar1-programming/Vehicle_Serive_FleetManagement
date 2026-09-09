@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using VehicleService.Application.DTOs;
 using VehicleService.Application.Interfaces;
 using VehicleService.Domain.Common;
@@ -99,6 +99,7 @@ public class VehicleManagementService : IVehicleService
             FuelType = dto.FuelType,
             Transmission = dto.Transmission,
             CurrentMileage = dto.CurrentMileage,
+            IsActive = dto.IsActive,
             InsuranceProvider = dto.InsuranceProvider,
             InsurancePolicyNumber = dto.InsurancePolicyNumber,
             InsuranceExpiryDate = dto.InsuranceExpiryDate,
@@ -121,16 +122,29 @@ public class VehicleManagementService : IVehicleService
         var vehicle = await _unitOfWork.Repository<Vehicle>().GetByIdAsync(id);
         if (vehicle == null) throw new DomainException("Vehicle not found.");
 
-        vehicle.Make = dto.Make;
-        vehicle.Model = dto.Model;
-        vehicle.Variant = dto.Variant;
-        vehicle.Color = dto.Color;
+        if (!string.IsNullOrWhiteSpace(dto.Make)) vehicle.Make = dto.Make.Trim();
+        if (!string.IsNullOrWhiteSpace(dto.Model)) vehicle.Model = dto.Model.Trim();
+        vehicle.Variant = dto.Variant?.Trim() ?? string.Empty;
+        if (dto.ManufacturingYear > 1900) vehicle.ManufacturingYear = dto.ManufacturingYear;
+        vehicle.Color = dto.Color?.Trim() ?? string.Empty;
         vehicle.FuelType = dto.FuelType;
         vehicle.Transmission = dto.Transmission;
-        vehicle.InsuranceProvider = dto.InsuranceProvider;
-        vehicle.InsurancePolicyNumber = dto.InsurancePolicyNumber;
+        if (dto.CurrentMileage >= 0) vehicle.CurrentMileage = dto.CurrentMileage;
+        vehicle.InsuranceProvider = dto.InsuranceProvider?.Trim();
+        vehicle.InsurancePolicyNumber = dto.InsurancePolicyNumber?.Trim();
         vehicle.InsuranceExpiryDate = dto.InsuranceExpiryDate;
+        vehicle.IsActive = dto.IsActive;
 
+        await _unitOfWork.Repository<Vehicle>().UpdateAsync(vehicle);
+        await _unitOfWork.SaveChangesAsync();
+    }
+
+    public async Task ToggleVehicleStatusAsync(int vehicleId)
+    {
+        var vehicle = await _unitOfWork.Repository<Vehicle>().GetByIdAsync(vehicleId);
+        if (vehicle == null) throw new DomainException("Vehicle not found.");
+
+        vehicle.IsActive = !vehicle.IsActive;
         await _unitOfWork.Repository<Vehicle>().UpdateAsync(vehicle);
         await _unitOfWork.SaveChangesAsync();
     }
@@ -192,6 +206,7 @@ public class VehicleManagementService : IVehicleService
             FuelType = v.FuelType,
             Transmission = v.Transmission,
             CurrentMileage = v.CurrentMileage,
+            IsActive = v.IsActive,
             InsuranceProvider = v.InsuranceProvider,
             InsurancePolicyNumber = v.InsurancePolicyNumber,
             InsuranceExpiryDate = v.InsuranceExpiryDate,

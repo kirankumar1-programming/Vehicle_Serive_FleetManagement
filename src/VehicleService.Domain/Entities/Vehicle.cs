@@ -1,4 +1,4 @@
-﻿using VehicleService.Domain.Common;
+using VehicleService.Domain.Common;
 using VehicleService.Domain.Enums;
 
 namespace VehicleService.Domain.Entities;
@@ -15,6 +15,7 @@ public class Vehicle : BaseEntity
     public VehicleFuelType FuelType { get; set; } = VehicleFuelType.Petrol;
     public TransmissionType Transmission { get; set; } = TransmissionType.Automatic;
     public int CurrentMileage { get; set; } // Current Odometer in KM
+    public bool IsActive { get; set; } = true;
     
     // Insurance
     public string? InsuranceProvider { get; set; }
