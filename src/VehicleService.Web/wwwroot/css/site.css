@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --primary: #2563eb;
   --primary-hover: #1d4ed8;
   --primary-light: #eff6ff;
@@ -53,6 +53,37 @@ body {
   transform: translateY(-1px);
 }
 
+/* Typography & Headings */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--secondary);
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+}
+
+/* Form Step Headers */
+.form-step-header,
+h5.fw-bold.text-primary {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--secondary) !important;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.form-step-header i,
+h5.fw-bold.text-primary i {
+  color: var(--primary);
+  font-size: 1.25rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
 /* Navbar */
 .navbar-custom {
   background-color: #ffffff;
@@ -72,7 +103,7 @@ body {
   color: var(--primary);
 }
 
-.nav-link {
+.navbar-custom .nav-link {
   font-weight: 500;
   color: var(--text-muted);
   border-radius: var(--radius);
@@ -80,9 +111,43 @@ body {
   transition: all 0.15s ease;
 }
 
-.nav-link:hover, .nav-link.active {
+.navbar-custom .nav-link:hover,
+.navbar-custom .nav-link.active {
   color: var(--primary) !important;
   background-color: var(--primary-light);
+}
+
+/* Nav Pills & Tab Headers */
+.nav-pills {
+  gap: 0.5rem;
+}
+
+.nav-pills .nav-link {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #475569 !important;
+  border-radius: var(--radius);
+  padding: 0.55rem 1.25rem !important;
+  background-color: #f1f5f9;
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+  line-height: 1.4;
+}
+
+.nav-pills .nav-link:hover:not(.active) {
+  color: var(--primary) !important;
+  background-color: var(--primary-light) !important;
+  border-color: #bfdbfe;
+}
+
+.nav-pills .nav-link.active,
+.nav-pills .show > .nav-link {
+  color: #ffffff !important;
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3), 0 2px 4px -2px rgba(37, 99, 235, 0.2);
+  font-weight: 600;
 }
 
 /* Cards & Containers */

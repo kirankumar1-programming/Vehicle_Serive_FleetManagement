@@ -1,4 +1,4 @@
-﻿@model BookAppointmentDto
+@model BookAppointmentDto
 @{
     ViewData["Title"] = "Schedule Service Appointment";
     var vehicles = ViewBag.Vehicles as IReadOnlyList<VehicleDto> ?? new List<VehicleDto>();
@@ -24,7 +24,7 @@
 
                     <!-- Step 1: Select Vehicle -->
                     <div class="mb-4">
-                        <h5 class="fw-bold text-primary mb-3"><i class="bi bi-1-circle-fill"></i> Select Vehicle</h5>
+                        <h5 class="form-step-header mb-3"><i class="bi bi-1-circle-fill"></i> Select Vehicle</h5>
                         @if (vehicles.Any())
                         {
                             <div class="row g-3">
@@ -53,7 +53,7 @@
 
                     <!-- Step 2: Select Service or Package -->
                     <div class="mb-4">
-                        <h5 class="fw-bold text-primary mb-3"><i class="bi bi-2-circle-fill"></i> Select Service or Package</h5>
+                        <h5 class="form-step-header mb-3"><i class="bi bi-2-circle-fill"></i> Select Service or Package</h5>
                         <ul class="nav nav-pills mb-3" id="serviceTab" role="tablist">
                             <li class="nav-item"><button class="nav-link active" id="single-tab" data-bs-toggle="pill" data-bs-target="#single" type="button">Individual Services</button></li>
                             <li class="nav-item"><button class="nav-link" id="package-tab" data-bs-toggle="pill" data-bs-target="#package" type="button">Curated Packages (Save 20%+)</button></li>
@@ -100,7 +100,7 @@
 
                     <!-- Step 3: Select Service Center, Date & Time Slot -->
                     <div class="mb-4">
-                        <h5 class="fw-bold text-primary mb-3"><i class="bi bi-3-circle-fill"></i> Center, Date & Time Slot</h5>
+                        <h5 class="form-step-header mb-3"><i class="bi bi-3-circle-fill"></i> Center, Date & Time Slot</h5>
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Service Center</label>
@@ -130,7 +130,7 @@
 
                     <!-- Step 4: Doorstep Pickup & Observations -->
                     <div class="mb-4">
-                        <h5 class="fw-bold text-primary mb-3"><i class="bi bi-4-circle-fill"></i> Additional Details</h5>
+                        <h5 class="form-step-header mb-3"><i class="bi bi-4-circle-fill"></i> Additional Details</h5>
                         <div class="mb-3 form-check">
                             <input asp-for="RequiresPickupDrop" class="form-check-input" id="chkPickup" onchange="document.getElementById('pickupBox').style.display = this.checked ? 'block' : 'none';" />
                             <label class="form-check-label fw-semibold" for="chkPickup">Request Valet Doorstep Vehicle Pick-up & Drop-off</label>
