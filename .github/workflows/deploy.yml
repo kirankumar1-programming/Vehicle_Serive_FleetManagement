@@ -26,15 +26,15 @@ jobs:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
     - name: Restore Dependencies
-      run: dotnet restore VehicleService.slnx
+      run: dotnet restore VehicleService.sln
 
-    - name: Build Solution
-      run: dotnet build VehicleService.slnx --no-restore --configuration Release
+    - name: Build with dotnet
+      run: dotnet build VehicleService.sln --no-restore --configuration Release
 
     - name: Run Tests
-      run: dotnet test VehicleService.slnx --no-build --configuration Release --verbosity normal
+      run: dotnet test VehicleService.sln --no-build --configuration Release --verbosity normal
 
-    - name: Publish Web App
+    - name: dotnet publish
       run: dotnet publish src/VehicleService.Web/VehicleService.Web.csproj -c Release -o ./publish
 
     - name: Upload Artifact for Deployment

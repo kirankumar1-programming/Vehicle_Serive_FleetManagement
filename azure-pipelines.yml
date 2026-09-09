@@ -31,7 +31,7 @@ stages:
         projects: '**/*.csproj'
 
     - task: DotNetCoreCLI@2
-      displayName: 'Build Solution'
+      displayName: 'Build with dotnet'
       inputs:
         command: 'build'
         projects: '**/*.csproj'
@@ -46,7 +46,7 @@ stages:
         publishTestResults: true
 
     - task: DotNetCoreCLI@2
-      displayName: 'Publish Web Project'
+      displayName: 'dotnet publish'
       inputs:
         command: 'publish'
         publishWebProjects: false
