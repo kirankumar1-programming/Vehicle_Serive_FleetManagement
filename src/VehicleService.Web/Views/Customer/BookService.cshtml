@@ -1,0 +1,158 @@
+﻿@model BookAppointmentDto
+@{
+    ViewData["Title"] = "Schedule Service Appointment";
+    var vehicles = ViewBag.Vehicles as IReadOnlyList<VehicleDto> ?? new List<VehicleDto>();
+    var serviceTypes = ViewBag.ServiceTypes as IReadOnlyList<ServiceType> ?? new List<ServiceType>();
+    var servicePackages = ViewBag.ServicePackages as IReadOnlyList<ServicePackage> ?? new List<ServicePackage>();
+    var serviceCenters = ViewBag.ServiceCenters as IReadOnlyList<ServiceCenter> ?? new List<ServiceCenter>();
+}
+
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <div class="card p-4 shadow border-0">
+                <div class="d-flex align-items-center gap-3 mb-4">
+                    <div class="stat-icon primary"><i class="bi bi-calendar-plus-fill"></i></div>
+                    <div>
+                        <h3 class="fw-bold mb-0">Schedule Service Appointment</h3>
+                        <p class="text-muted small mb-0">Book guaranteed service slots with instant confirmation</p>
+                    </div>
+                </div>
+
+                <form asp-action="BookService" method="post">
+                    @Html.AntiForgeryToken()
+
+                    <!-- Step 1: Select Vehicle -->
+                    <div class="mb-4">
+                        <h5 class="fw-bold text-primary mb-3"><i class="bi bi-1-circle-fill"></i> Select Vehicle</h5>
+                        @if (vehicles.Any())
+                        {
+                            <div class="row g-3">
+                                @foreach (var v in vehicles)
+                                {
+                                    <div class="col-md-6">
+                                        <label class="card p-3 border cursor-pointer h-100 d-flex flex-row align-items-center gap-3">
+                                            <input type="radio" asp-for="VehicleId" value="@v.Id" class="form-check-input mt-0" required />
+                                            <div>
+                                                <div class="fw-bold">@v.Make @v.Model</div>
+                                                <span class="badge bg-secondary font-monospace">@v.RegistrationNumber</span>
+                                                <span class="text-muted small ms-2">@v.CurrentMileage.ToString("N0") KM</span>
+                                            </div>
+                                        </label>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-info">
+                                You have no registered vehicles. <a asp-action="AddVehicle" class="fw-bold">Register a vehicle first &rarr;</a>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Step 2: Select Service or Package -->
+                    <div class="mb-4">
+                        <h5 class="fw-bold text-primary mb-3"><i class="bi bi-2-circle-fill"></i> Select Service or Package</h5>
+                        <ul class="nav nav-pills mb-3" id="serviceTab" role="tablist">
+                            <li class="nav-item"><button class="nav-link active" id="single-tab" data-bs-toggle="pill" data-bs-target="#single" type="button">Individual Services</button></li>
+                            <li class="nav-item"><button class="nav-link" id="package-tab" data-bs-toggle="pill" data-bs-target="#package" type="button">Curated Packages (Save 20%+)</button></li>
+                        </ul>
+                        <div class="tab-content" id="serviceTabContent">
+                            <div class="tab-pane fade show active" id="single">
+                                <div class="row g-3">
+                                    @foreach (var s in serviceTypes)
+                                    {
+                                        <div class="col-md-6">
+                                            <label class="card p-3 border h-100">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <input type="radio" asp-for="ServiceTypeId" value="@s.Id" class="form-check-input" />
+                                                    <span class="badge bg-primary fs-6">₹@s.BasePrice.ToString("N0")</span>
+                                                </div>
+                                                <strong class="d-block">@s.Name</strong>
+                                                <p class="text-muted small mb-0">@s.Description</p>
+                                                <div class="small text-secondary mt-2"><i class="bi bi-clock"></i> ~@s.EstimatedDurationHours hrs | Labor: ₹@s.LaborCharges.ToString("N0")</div>
+                                            </label>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                            <div class="tab-pane fade" id="package">
+                                <div class="row g-3">
+                                    @foreach (var pkg in servicePackages)
+                                    {
+                                        <div class="col-md-6">
+                                            <label class="card p-3 border h-100 border-primary">
+                                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                                    <input type="radio" asp-for="ServicePackageId" value="@pkg.Id" class="form-check-input" />
+                                                    <span class="badge bg-success">Save @pkg.SavingsPercent%</span>
+                                                </div>
+                                                <strong class="text-primary d-block">@pkg.Name</strong>
+                                                <p class="text-muted small mb-1">@pkg.Description</p>
+                                                <div class="fw-bold fs-5 text-dark">₹@pkg.PackagePrice.ToString("N0")</div>
+                                            </label>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Select Service Center, Date & Time Slot -->
+                    <div class="mb-4">
+                        <h5 class="fw-bold text-primary mb-3"><i class="bi bi-3-circle-fill"></i> Center, Date & Time Slot</h5>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">Service Center</label>
+                                <select asp-for="ServiceCenterId" class="form-select" required>
+                                    @foreach (var c in serviceCenters)
+                                    {
+                                        <option value="@c.Id">@c.Name (@c.City)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold">Appointment Date</label>
+                                <input asp-for="AppointmentDate" type="date" class="form-control" value="@DateTime.UtcNow.Date.AddDays(1).ToString("yyyy-MM-dd")" min="@DateTime.UtcNow.ToString("yyyy-MM-dd")" required />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold">Preferred Time Slot</label>
+                                <select asp-for="TimeSlot" class="form-select" required>
+                                    <option value="08:30 AM - 10:30 AM">08:30 AM - 10:30 AM</option>
+                                    <option value="09:00 AM - 11:00 AM" selected>09:00 AM - 11:00 AM</option>
+                                    <option value="11:30 AM - 01:30 PM">11:30 AM - 01:30 PM</option>
+                                    <option value="02:00 PM - 04:00 PM">02:00 PM - 04:00 PM</option>
+                                    <option value="04:30 PM - 06:30 PM">04:30 PM - 06:30 PM</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 4: Doorstep Pickup & Observations -->
+                    <div class="mb-4">
+                        <h5 class="fw-bold text-primary mb-3"><i class="bi bi-4-circle-fill"></i> Additional Details</h5>
+                        <div class="mb-3 form-check">
+                            <input asp-for="RequiresPickupDrop" class="form-check-input" id="chkPickup" onchange="document.getElementById('pickupBox').style.display = this.checked ? 'block' : 'none';" />
+                            <label class="form-check-label fw-semibold" for="chkPickup">Request Valet Doorstep Vehicle Pick-up & Drop-off</label>
+                        </div>
+                        <div class="mb-3" id="pickupBox" style="display: none;">
+                            <label class="form-label fw-semibold">Pickup Address</label>
+                            <textarea asp-for="PickupAddress" class="form-control" rows="2" placeholder="Full residential/office address for vehicle pickup"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Specific Issues or Symptoms Noticed (Optional)</label>
+                            <textarea asp-for="CustomerNotes" class="form-control" rows="2" placeholder="e.g. Brake noise, AC cooling weak, engine vibration at idle..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                        <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary px-5 py-2 fw-semibold">
+                            <i class="bi bi-check-lg"></i> Confirm & Book Appointment
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

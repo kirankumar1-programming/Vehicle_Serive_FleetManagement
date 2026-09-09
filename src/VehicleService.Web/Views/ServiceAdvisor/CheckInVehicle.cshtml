@@ -1,0 +1,118 @@
+﻿@{
+    ViewData["Title"] = "Vehicle Check-In & Inspection";
+    var appt = ViewBag.Appointment as AppointmentDto;
+    var mechanics = ViewBag.Mechanics as IList<ApplicationUser> ?? new List<ApplicationUser>();
+    var bays = ViewBag.Bays as IReadOnlyList<ServiceBay> ?? new List<ServiceBay>();
+}
+
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card p-4 shadow border-0">
+                <div class="d-flex align-items-center gap-3 mb-4">
+                    <div class="stat-icon primary"><i class="bi bi-clipboard-check-fill"></i></div>
+                    <div>
+                        <h3 class="fw-bold mb-0">Vehicle Intake & 40-Point Inspection</h3>
+                        <p class="text-muted small mb-0">Appointment: @appt?.AppointmentNumber | Vehicle: <strong>@appt?.VehicleInfo</strong></p>
+                    </div>
+                </div>
+
+                <form asp-action="CheckInVehicle" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="appointmentId" value="@appt?.Id" />
+
+                    <!-- Allocation -->
+                    <div class="row g-3 mb-4 p-3 bg-light rounded border">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Assign Service Bay</label>
+                            <select name="bayId" class="form-select">
+                                <option value="">Auto Assign Available Bay</option>
+                                @foreach (var b in bays)
+                                {
+                                    <option value="@b.Id" selected="@(appt?.ServiceBayId == b.Id)">@b.BayName (@b.Status)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Assign Master Mechanic (Scenario 6 Overlap Prevention)</label>
+                            <select name="mechanicId" class="form-select">
+                                <option value="">Assign Later</option>
+                                @foreach (var m in mechanics)
+                                {
+                                    <option value="@m.Id">@m.FullName</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 40-Point Condition Inspection -->
+                    <h5 class="fw-bold text-primary mb-3"><i class="bi bi-heart-pulse"></i> Initial Multi-Point Health Check</h5>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Odometer Reading (KM) *</label>
+                            <input type="number" name="mileage" class="form-control" value="21500" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Fuel Level</label>
+                            <select name="fuelLevel" class="form-select">
+                                <option value="25%">25% (Quarter)</option>
+                                <option value="50%" selected>50% (Half Tank)</option>
+                                <option value="75%">75% (Three Quarter)</option>
+                                <option value="Full">Full Tank</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Engine Condition</label>
+                            <select name="engineCond" class="form-select">
+                                <option value="Good - Smooth idle">Good - Smooth idle</option>
+                                <option value="NeedsAttention - Misfire/Noise">Needs Attention</option>
+                                <option value="Critical">Critical</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Brakes Condition</label>
+                            <select name="brakeCond" class="form-select">
+                                <option value="Good">Good</option>
+                                <option value="NeedsAttention - Pad worn" selected>Needs Attention - Worn Pads</option>
+                                <option value="Critical">Critical</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Tyres Condition</label>
+                            <select name="tyreCond" class="form-select">
+                                <option value="Good - 6mm depth" selected>Good (6mm depth)</option>
+                                <option value="Fair">Fair</option>
+                                <option value="Needs Replacement">Needs Replacement</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Battery & Electricals</label>
+                            <select name="batteryCond" class="form-select">
+                                <option value="Good - 12.6V healthy" selected>Good (12.6V)</option>
+                                <option value="Weak - Needs Recharge">Weak</option>
+                                <option value="Dead - Replace">Dead</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Fluid Levels (Coolant, Brake, Washer)</label>
+                            <input type="text" name="fluidLevels" class="form-control" value="Engine oil dark, coolant normal" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Existing Body Scratches / Damages</label>
+                            <input type="text" name="damages" class="form-control" placeholder="e.g. Minor 2cm scratch on rear left bumper" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Inspection Summary / Observations</label>
+                            <textarea name="summary" class="form-control" rows="2" placeholder="Summary notes for the repair estimate & customer review">Routine periodic service approved. Recommend front brake pad replacement.</textarea>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                        <a asp-action="Appointments" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-success px-4 fw-semibold"><i class="bi bi-check-lg"></i> Complete Intake & Generate Job Card</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,59 @@
+﻿@model InventoryPartDto
+@{
+    ViewData["Title"] = "Add Spare Part";
+}
+
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card p-4 shadow border-0">
+                <h3 class="fw-bold mb-3"><i class="bi bi-plus-circle text-primary"></i> Add Spare Part to Catalog</h3>
+                <form asp-action="AddPart" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Part Number (SKU) *</label>
+                            <input asp-for="PartNumber" class="form-control text-uppercase" placeholder="e.g. BP-102" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Part Name *</label>
+                            <input asp-for="Name" class="form-control" placeholder="e.g. Ceramic Front Brake Pad Set" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Category *</label>
+                            <input asp-for="Category" class="form-control" placeholder="e.g. Brakes, Fluids, Engine" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Manufacturer *</label>
+                            <input asp-for="Manufacturer" class="form-control" placeholder="e.g. Bosch, Mann-Filter" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Cost Price (₹) *</label>
+                            <input asp-for="CostPrice" type="number" class="form-control" value="2000" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Selling Price (₹) *</label>
+                            <input asp-for="SellingPrice" type="number" class="form-control" value="3500" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Initial Stock Quantity *</label>
+                            <input asp-for="AvailableQuantity" type="number" class="form-control" value="20" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Reorder Alert Level</label>
+                            <input asp-for="ReorderLevel" type="number" class="form-control" value="5" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Warehouse Location</label>
+                            <input asp-for="WarehouseLocation" class="form-control" value="Bay A - Rack 01" />
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                        <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary px-4">Save Part</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

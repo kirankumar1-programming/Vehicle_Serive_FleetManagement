@@ -1,0 +1,60 @@
+﻿@model IReadOnlyList<InvoiceDto>
+@{
+    ViewData["Title"] = "My Invoices";
+}
+
+<div class="container-fluid px-lg-4 my-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">Invoices & Receipts</h2>
+            <p class="text-muted small mb-0">View tax invoices, download print-ready PDFs, and make secure online payments</p>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-custom mb-0">
+                <thead>
+                    <tr>
+                        <th>Invoice #</th>
+                        <th>Job Card</th>
+                        <th>Vehicle</th>
+                        <th>Issue Date</th>
+                        <th>Amount</th>
+                        <th>Payment Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Any())
+                    {
+                        @foreach (var inv in Model)
+                        {
+                            <tr>
+                                <td class="fw-bold font-monospace text-primary">@inv.InvoiceNumber</td>
+                                <td>@inv.JobCardNumber</td>
+                                <td>@inv.VehicleInfo (@inv.RegistrationNumber)</td>
+                                <td>@inv.IssueDate.ToString("MMM dd, yyyy")</td>
+                                <td class="fw-bold">₹@inv.GrandTotal.ToString("N2")</td>
+                                <td>
+                                    <span class="badge @(inv.Status == PaymentStatus.Successful ? "bg-success" : "bg-warning text-dark") fs-6">
+                                        @inv.Status
+                                    </span>
+                                </td>
+                                <td>
+                                    <a asp-action="ViewInvoice" asp-route-id="@inv.Id" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-receipt"></i> View / Pay
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr><td colspan="7" class="text-center py-4 text-muted">No invoices generated yet.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

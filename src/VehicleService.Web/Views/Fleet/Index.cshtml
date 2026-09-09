@@ -1,0 +1,105 @@
+﻿@model FleetDashboardDto
+@{
+    ViewData["Title"] = "Corporate Fleet Dashboard";
+}
+
+<div class="container-fluid px-lg-4 my-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-truck text-danger"></i> Corporate Fleet Management</h2>
+            <p class="text-muted small mb-0">Live fleet asset tracking, preventive maintenance schedules, downtime metrics & cost analytics</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-action="PreventiveMaintenance" class="btn btn-outline-warning btn-sm">
+                <i class="bi bi-tools"></i> Maintenance Due (@Model.DueForMaintenanceCount)
+            </a>
+            <a asp-action="Vehicles" class="btn btn-primary btn-sm"><i class="bi bi-truck"></i> Manage Fleet Vehicles</a>
+        </div>
+    </div>
+
+    <!-- Fleet KPI Stat Widgets -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card border-0 shadow-sm">
+                <div class="stat-icon primary"><i class="bi bi-truck"></i></div>
+                <div>
+                    <h3 class="fw-bold mb-0">@Model.TotalFleetVehicles</h3>
+                    <div class="text-muted small">Total Fleet Vehicles</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-0 shadow-sm">
+                <div class="stat-icon warning"><i class="bi bi-wrench"></i></div>
+                <div>
+                    <h3 class="fw-bold mb-0">@Model.ActiveInService</h3>
+                    <div class="text-muted small">Currently in Workshop</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-0 shadow-sm">
+                <div class="stat-icon danger"><i class="bi bi-exclamation-triangle"></i></div>
+                <div>
+                    <h3 class="fw-bold mb-0">@Model.DueForMaintenanceCount</h3>
+                    <div class="text-muted small">Due for Periodic Service</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-0 shadow-sm">
+                <div class="stat-icon success"><i class="bi bi-currency-rupee"></i></div>
+                <div>
+                    <h3 class="fw-bold mb-0">₹@Model.TotalMaintenanceCost.ToString("N0")</h3>
+                    <div class="text-muted small">Total Maintenance Spend</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fleet Vehicles Status -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="fw-bold">Fleet Vehicle Status</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-custom mb-0">
+                <thead>
+                    <tr>
+                        <th>Registration Plate</th>
+                        <th>Vehicle Details</th>
+                        <th>Assigned Driver</th>
+                        <th>Odometer</th>
+                        <th>Next Service Due</th>
+                        <th>Compliance Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var v in Model.FleetVehicles)
+                    {
+                        <tr>
+                            <td class="fw-bold font-monospace text-primary">@v.RegistrationNumber</td>
+                            <td>
+                                <strong>@v.Make @v.Model</strong>
+                                <div class="small text-muted">@v.Variant (@v.FuelType)</div>
+                            </td>
+                            <td>@(v.CurrentDriverName ?? "Unassigned")</td>
+                            <td>@v.CurrentMileage.ToString("N0") KM</td>
+                            <td>@v.NextServiceDueMileage.ToString("N0") KM</td>
+                            <td>
+                                @if (v.IsMaintenanceDue)
+                                {
+                                    <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle-fill"></i> Maintenance Due</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-success"><i class="bi bi-check-circle-fill"></i> Compliant</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,118 @@
+﻿@model IReadOnlyList<WarrantyDto>
+@{
+    ViewData["Title"] = "Vehicle Warranties & Claims";
+}
+
+<div class="container-fluid px-lg-4 my-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">Vehicle Warranties & Protection Plans</h2>
+            <p class="text-muted small mb-0">Check active manufacturer & extended warranty coverage and submit claims (Scenario 7)</p>
+        </div>
+    </div>
+
+    @if (Model.Any())
+    {
+        <div class="row g-4">
+            @foreach (var w in Model)
+            {
+                <div class="col-md-6">
+                    <div class="card p-4 border-0 shadow-sm h-100">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <span class="badge bg-primary font-monospace fs-6">@w.WarrantyNumber</span>
+                                <h4 class="fw-bold mt-2 mb-0">@w.Provider</h4>
+                                <span class="text-muted small">Vehicle: @w.VehicleInfo (@w.RegistrationNumber)</span>
+                            </div>
+                            <span class="badge @(w.IsCurrentlyValid ? "bg-success" : "bg-danger") fs-6 px-3 py-1">
+                                @(w.IsCurrentlyValid ? "Active Coverage" : "Expired")
+                            </span>
+                        </div>
+
+                        <hr class="my-2 border-light">
+
+                        <div class="small my-2">
+                            <div><strong>Coverage Terms:</strong> @w.CoverageTerms</div>
+                            <div class="text-muted mt-1"><strong>Covered Components:</strong> @w.CoveredItemsSummary</div>
+                            <div class="mt-2 text-secondary">
+                                <i class="bi bi-calendar-event"></i> Valid: @w.StartDate.ToString("yyyy-MM-dd") to <strong>@w.EndDate.ToString("yyyy-MM-dd")</strong> | Max Limit: <strong>@w.MaxMileageLimit.ToString("N0") KM</strong>
+                            </div>
+                        </div>
+
+                        <!-- Submit Claim Button -->
+                        @if (w.IsCurrentlyValid)
+                        {
+                            <div class="mt-3 pt-2 border-top">
+                                <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#claimModal_@w.Id">
+                                    <i class="bi bi-file-earmark-plus"></i> Submit Warranty Claim
+                                </button>
+                            </div>
+
+                            <!-- Claim Modal -->
+                            <div class="modal fade" id="claimModal_@w.Id" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title fw-bold">Submit Warranty Claim</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <form asp-action="SubmitWarrantyClaim" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="warrantyId" value="@w.Id" />
+                                            <div class="modal-body">
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-semibold">Failed Component / Part Name *</label>
+                                                    <input type="text" name="component" class="form-control" placeholder="e.g. Brake Caliper, ABS Module, ECU" required />
+                                                    <small class="text-muted">Must match covered components: @w.CoveredItemsSummary</small>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-semibold">Issue Description *</label>
+                                                    <textarea name="issueDesc" class="form-control" rows="2" placeholder="Describe symptoms or breakdown failure" required></textarea>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-semibold">Estimated Repair / Replacement Cost (₹) *</label>
+                                                    <input type="number" name="amount" class="form-control" value="4500" required />
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                <button type="submit" class="btn btn-primary">Submit Claim</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        <!-- Existing Claims on this Warranty -->
+                        @if (w.Claims.Any())
+                        {
+                            <div class="mt-3 pt-2 border-top">
+                                <h6 class="fw-bold small text-muted text-uppercase">Claim History</h6>
+                                @foreach (var c in w.Claims)
+                                {
+                                    <div class="p-2 border rounded bg-light small mb-1 d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>@c.ClaimNumber</strong> - @c.ComponentName (₹@c.AmountClaimed.ToString("N0"))
+                                        </div>
+                                        <span class="badge @(c.Status == WarrantyClaimStatus.Approved ? "bg-success" : (c.Status == WarrantyClaimStatus.Rejected ? "bg-danger" : "bg-warning text-dark"))">
+                                            @c.Status
+                                        </span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="card p-5 text-center border-0 shadow-sm">
+            <i class="bi bi-shield-x fs-1 text-muted mb-3"></i>
+            <h4>No warranties registered</h4>
+            <p class="text-muted">Warranty policies linked to your vehicles will appear here.</p>
+        </div>
+    }
+</div>

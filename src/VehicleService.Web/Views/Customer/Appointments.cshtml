@@ -1,0 +1,107 @@
+﻿@model IReadOnlyList<AppointmentDto>
+@{
+    ViewData["Title"] = "My Service Appointments";
+}
+
+<div class="container-fluid px-lg-4 my-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">Service Appointments</h2>
+            <p class="text-muted small mb-0">View scheduled bookings, live status, and cancellation options</p>
+        </div>
+        <a asp-action="BookService" class="btn btn-primary"><i class="bi bi-calendar-plus"></i> Book New Service</a>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-custom mb-0">
+                <thead>
+                    <tr>
+                        <th>Appointment #</th>
+                        <th>Vehicle</th>
+                        <th>Service / Package</th>
+                        <th>Service Center</th>
+                        <th>Date & Slot</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Any())
+                    {
+                        @foreach (var a in Model)
+                        {
+                            <tr>
+                                <td class="fw-bold font-monospace text-primary">@a.AppointmentNumber</td>
+                                <td>
+                                    <strong>@a.VehicleInfo</strong>
+                                </td>
+                                <td>@(a.ServicePackageName ?? a.ServiceTypeName ?? "Custom Inspection")</td>
+                                <td>@a.ServiceCenterName</td>
+                                <td>
+                                    <div>@a.AppointmentDate.ToString("MMM dd, yyyy")</div>
+                                    <small class="text-muted">@a.TimeSlot</small>
+                                </td>
+                                <td>
+                                    <span class="badge-status @a.Status.ToString().ToLower()">
+                                        <i class="bi bi-circle-fill" style="font-size: 0.5rem;"></i> @a.Status
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        @if (a.JobCardId.HasValue)
+                                        {
+                                            <a asp-action="TrackJob" asp-route-id="@a.JobCardId" class="btn btn-sm btn-primary">
+                                                <i class="bi bi-broadcast"></i> Track Live
+                                            </a>
+                                        }
+                                        @if (a.Status == AppointmentStatus.Confirmed || a.Status == AppointmentStatus.Pending)
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelModal_@a.Id">
+                                                Cancel
+                                            </button>
+
+                                            <!-- Cancel Modal -->
+                                            <div class="modal fade" id="cancelModal_@a.Id" tabindex="-1">
+                                                <div class="modal-dialog">
+                                                    <div class="modal-content">
+                                                        <div class="modal-header">
+                                                            <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle"></i> Cancel Appointment</h5>
+                                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                        </div>
+                                                        <form asp-action="CancelAppointment" method="post">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="appointmentId" value="@a.Id" />
+                                                            <div class="modal-body text-start">
+                                                                <p>Are you sure you want to cancel appointment <strong>@a.AppointmentNumber</strong>?</p>
+                                                                <p class="text-muted small">Cancelling will release the allocated service bay and any reserved spare parts back to inventory.</p>
+                                                                <div class="mb-3">
+                                                                    <label class="form-label fw-semibold">Reason for Cancellation</label>
+                                                                    <input type="text" name="reason" class="form-control" placeholder="e.g. Schedule conflict, vehicle sold..." required />
+                                                                </div>
+                                                            </div>
+                                                            <div class="modal-footer">
+                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                                                <button type="submit" class="btn btn-danger">Confirm Cancellation</button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center py-4 text-muted">No appointments found.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

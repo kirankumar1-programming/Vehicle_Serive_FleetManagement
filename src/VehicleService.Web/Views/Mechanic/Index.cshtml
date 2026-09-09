@@ -1,0 +1,56 @@
+﻿@model IReadOnlyList<JobCardDto>
+@{
+    ViewData["Title"] = "My Assigned Jobs";
+}
+
+<div class="container-fluid px-lg-4 my-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-wrench-adjustable text-warning"></i> Mechanic Workstation</h2>
+            <p class="text-muted small mb-0">Active repair job cards assigned to you</p>
+        </div>
+    </div>
+
+    @if (Model.Any())
+    {
+        <div class="row g-4">
+            @foreach (var j in Model)
+            {
+                <div class="col-md-6 col-lg-4">
+                    <div class="card h-100 border-0 shadow-sm p-4">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <span class="badge bg-primary font-monospace">@j.JobCardNumber</span>
+                                <h5 class="fw-bold mt-2 mb-0">@j.VehicleInfo</h5>
+                                <span class="badge bg-light text-dark border font-monospace">@j.RegistrationNumber</span>
+                            </div>
+                            <span class="badge-status @j.Status.ToString().ToLower()">@j.Status</span>
+                        </div>
+
+                        <hr class="my-2 border-light">
+
+                        <div class="small text-muted my-2">
+                            <div><i class="bi bi-building"></i> Bay: <strong>@(j.ServiceBayName ?? "General Bay")</strong></div>
+                            <div><i class="bi bi-person"></i> Advisor: @(j.ServiceAdvisorName ?? "Advisor")</div>
+                            <div><i class="bi bi-stopwatch"></i> Labor Logged: <strong>@j.TotalLaborHours hrs</strong></div>
+                        </div>
+
+                        <div class="mt-3 pt-2 border-top">
+                            <a asp-action="JobDetails" asp-route-id="@j.Id" class="btn btn-warning w-100 fw-semibold">
+                                <i class="bi bi-tools"></i> Open Digital Checklist &rarr;
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="card p-5 text-center border-0 shadow-sm">
+            <i class="bi bi-check2-circle fs-1 text-success mb-3"></i>
+            <h4>No pending repair jobs</h4>
+            <p class="text-muted">All assigned vehicles are completed. Check with the Service Advisor for new vehicle assignments.</p>
+        </div>
+    }
+</div>

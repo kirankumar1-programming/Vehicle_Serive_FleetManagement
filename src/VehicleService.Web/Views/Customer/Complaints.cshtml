@@ -1,0 +1,76 @@
+﻿@model IReadOnlyList<CustomerComplaintDto>
+@{
+    ViewData["Title"] = "Customer Support & Complaints";
+    var vehicles = ViewBag.Vehicles as IReadOnlyList<VehicleDto> ?? new List<VehicleDto>();
+}
+
+<div class="container-fluid px-lg-4 my-4">
+    <div class="row g-4">
+        <div class="col-lg-5">
+            <div class="card p-4 border-0 shadow-sm">
+                <h4 class="fw-bold mb-3"><i class="bi bi-chat-left-dots text-primary"></i> Raise Support Ticket / Complaint</h4>
+                <form asp-action="RaiseComplaint" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Related Vehicle (Optional)</label>
+                        <select name="vehicleId" class="form-select">
+                            <option value="">General Support</option>
+                            @foreach (var v in vehicles)
+                            {
+                                <option value="@v.Id">@v.Make @v.Model (@v.RegistrationNumber)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Subject / Issue Title *</label>
+                        <input type="text" name="subject" class="form-control" placeholder="e.g. Billing discrepancy, delay in service" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Detailed Description *</label>
+                        <textarea name="description" class="form-control" rows="3" placeholder="Please provide details of your issue..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 py-2">Submit Ticket</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="card p-4 border-0 shadow-sm h-100">
+                <h4 class="fw-bold mb-3"><i class="bi bi-ticket-perforated text-primary"></i> My Support Tickets</h4>
+                @if (Model.Any())
+                {
+                    <div class="d-flex flex-column gap-3">
+                        @foreach (var c in Model)
+                        {
+                            <div class="card p-3 border">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div>
+                                        <span class="badge bg-dark font-monospace">@c.TicketNumber</span>
+                                        <h5 class="fw-bold mt-2 mb-0">@c.Subject</h5>
+                                    </div>
+                                    <span class="badge @(c.Status == ComplaintStatus.Resolved ? "bg-success" : "bg-warning text-dark") fs-6">
+                                        @c.Status
+                                    </span>
+                                </div>
+                                <p class="text-muted small mb-2">@c.Description</p>
+                                @if (!string.IsNullOrEmpty(c.ResolutionNotes))
+                                {
+                                    <div class="alert alert-success py-1 px-2 small mb-0">
+                                        <strong>Resolution:</strong> @c.ResolutionNotes
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-check-circle fs-1 text-success mb-2"></i>
+                        <h5>No open support tickets</h5>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

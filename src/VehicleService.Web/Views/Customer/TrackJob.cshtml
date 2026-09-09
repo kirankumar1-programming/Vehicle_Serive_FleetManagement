@@ -1,0 +1,189 @@
+﻿@model JobCardDto
+@{
+    ViewData["Title"] = $"Live Servicing Tracker - {Model.JobCardNumber}";
+    var inspection = ViewBag.Inspection as VehicleInspection;
+    var estimate = ViewBag.Estimate as RepairEstimateDto;
+    var invoice = ViewBag.Invoice as InvoiceDto;
+
+    var status = Model.Status;
+    int stepIndex = status switch
+    {
+        AppointmentStatus.Pending or AppointmentStatus.Confirmed => 1,
+        AppointmentStatus.VehicleReceived or AppointmentStatus.UnderInspection => 2,
+        AppointmentStatus.EstimateCreated => 3,
+        AppointmentStatus.EstimateApproved or AppointmentStatus.InProgress => 4,
+        AppointmentStatus.QualityCheck => 5,
+        AppointmentStatus.ReadyForDelivery => 6,
+        AppointmentStatus.Completed => 7,
+        _ => 1
+    };
+}
+
+<div class="container-fluid px-lg-4 my-4">
+    <!-- Header Banner -->
+    <div class="card p-4 border-0 shadow-sm mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <span class="badge bg-primary fs-6 font-monospace mb-2">@Model.JobCardNumber</span>
+                <h3 class="fw-bold mb-0">@Model.VehicleInfo</h3>
+                <p class="text-muted small mb-0">Service Advisor: <strong>@(Model.ServiceAdvisorName ?? "Vikram Malhotra")</strong> | Lead Mechanic: <strong>@(Model.MechanicName ?? "Workshop Assigned")</strong></p>
+            </div>
+            <div class="text-end">
+                <span class="badge-status @Model.Status.ToString().ToLower() fs-6 px-3 py-2">
+                    <i class="bi bi-broadcast"></i> @Model.Status
+                </span>
+                <div class="small text-muted mt-1">Odometer: <strong>@Model.OdometerIn.ToString("N0") KM</strong></div>
+            </div>
+        </div>
+
+        <!-- 7-Stage Visual Timeline Stepper -->
+        <div class="timeline-stepper mt-4">
+            <div class="step-item @(stepIndex >= 1 ? "completed" : "") @(stepIndex == 1 ? "active" : "")">
+                <div class="step-bubble"><i class="bi bi-calendar-check"></i></div>
+                <div class="step-title">1. Scheduled</div>
+            </div>
+            <div class="step-item @(stepIndex >= 2 ? "completed" : "") @(stepIndex == 2 ? "active" : "")">
+                <div class="step-bubble"><i class="bi bi-clipboard-check"></i></div>
+                <div class="step-title">2. Inspection</div>
+            </div>
+            <div class="step-item @(stepIndex >= 3 ? "completed" : "") @(stepIndex == 3 ? "active" : "")">
+                <div class="step-bubble"><i class="bi bi-calculator"></i></div>
+                <div class="step-title">3. Estimate</div>
+            </div>
+            <div class="step-item @(stepIndex >= 4 ? "completed" : "") @(stepIndex == 4 ? "active" : "")">
+                <div class="step-bubble"><i class="bi bi-wrench"></i></div>
+                <div class="step-title">4. Repairing</div>
+            </div>
+            <div class="step-item @(stepIndex >= 5 ? "completed" : "") @(stepIndex == 5 ? "active" : "")">
+                <div class="step-bubble"><i class="bi bi-shield-check"></i></div>
+                <div class="step-title">5. Quality Check</div>
+            </div>
+            <div class="step-item @(stepIndex >= 6 ? "completed" : "") @(stepIndex == 6 ? "active" : "")">
+                <div class="step-bubble"><i class="bi bi-car-front"></i></div>
+                <div class="step-title">6. Ready</div>
+            </div>
+            <div class="step-item @(stepIndex >= 7 ? "completed" : "") @(stepIndex == 7 ? "active" : "")">
+                <div class="step-bubble"><i class="bi bi-check2-circle"></i></div>
+                <div class="step-title">7. Delivered</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert / Actionable Cards -->
+    @if (estimate != null && estimate.ApprovalStatus == EstimateApprovalStatus.Pending)
+    {
+        <div class="alert alert-warning p-3 shadow-sm d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+            <div class="d-flex align-items-center gap-3">
+                <i class="bi bi-exclamation-diamond-fill fs-2 text-warning"></i>
+                <div>
+                    <h5 class="fw-bold mb-0">Repair Estimate Requires Your Approval!</h5>
+                    <p class="small mb-0">Service Advisor has prepared an itemized estimate for ₹@estimate.GrandTotal.ToString("N2").</p>
+                </div>
+            </div>
+            <a asp-action="ViewEstimate" asp-route-id="@estimate.Id" class="btn btn-warning fw-semibold">
+                <i class="bi bi-eye"></i> Review & Approve Estimate &rarr;
+            </a>
+        </div>
+    }
+
+    @if (invoice != null)
+    {
+        <div class="alert alert-info p-3 shadow-sm d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+            <div class="d-flex align-items-center gap-3">
+                <i class="bi bi-receipt fs-2 text-info"></i>
+                <div>
+                    <h5 class="fw-bold mb-0">Invoice @invoice.InvoiceNumber</h5>
+                    <p class="small mb-0">Total: <strong>₹@invoice.GrandTotal.ToString("N2")</strong> | Status: <span class="badge @(invoice.Status == PaymentStatus.Successful ? "bg-success" : "bg-warning text-dark")">@invoice.Status</span></p>
+                </div>
+            </div>
+            <a asp-action="ViewInvoice" asp-route-id="@invoice.Id" class="btn btn-info text-white fw-semibold">
+                <i class="bi bi-credit-card"></i> View Invoice / Pay Online &rarr;
+            </a>
+        </div>
+    }
+
+    <div class="row g-4">
+        <!-- Inspection Health Report -->
+        <div class="col-lg-6">
+            <div class="card h-100 p-4 border-0 shadow-sm">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <i class="bi bi-heart-pulse text-danger fs-4"></i>
+                    <h5 class="fw-bold mb-0">40-Point Health Inspection</h5>
+                </div>
+                @if (inspection != null)
+                {
+                    <div class="row g-2 small">
+                        <div class="col-6 p-2 border rounded bg-light"><strong>Engine:</strong> @inspection.EngineCondition</div>
+                        <div class="col-6 p-2 border rounded bg-light"><strong>Brakes:</strong> @inspection.BrakeCondition</div>
+                        <div class="col-6 p-2 border rounded bg-light"><strong>Tyres:</strong> @inspection.TyreCondition</div>
+                        <div class="col-6 p-2 border rounded bg-light"><strong>Battery:</strong> @inspection.BatteryCondition</div>
+                        <div class="col-6 p-2 border rounded bg-light"><strong>Fluids:</strong> @inspection.FluidLevels</div>
+                        <div class="col-6 p-2 border rounded bg-light"><strong>Fuel Level:</strong> @inspection.FuelLevel</div>
+                    </div>
+                    @if (!string.IsNullOrEmpty(inspection.InspectionSummary))
+                    {
+                        <div class="mt-3 p-2 bg-light border-start border-3 border-primary small">
+                            <strong>Advisor Remarks:</strong> @inspection.InspectionSummary
+                        </div>
+                    }
+                }
+                else
+                {
+                    <p class="text-muted small">Inspection is in progress by your assigned Service Advisor.</p>
+                }
+            </div>
+        </div>
+
+        <!-- Labor & Parts Consumption Log -->
+        <div class="col-lg-6">
+            <div class="card h-100 p-4 border-0 shadow-sm">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <i class="bi bi-tools text-primary fs-4"></i>
+                    <h5 class="fw-bold mb-0">Technician Activity Log</h5>
+                </div>
+                <div class="mb-3">
+                    <h6 class="fw-semibold small text-muted text-uppercase">Replaced Spare Parts</h6>
+                    @if (Model.ConsumedParts.Any())
+                    {
+                        <ul class="list-group list-group-flush small">
+                            @foreach (var p in Model.ConsumedParts)
+                            {
+                                <li class="list-group-item d-flex justify-content-between px-0 py-1">
+                                    <span><i class="bi bi-box-seam text-secondary"></i> @p.PartName (@p.PartNumber) x @p.Quantity</span>
+                                    <strong>₹@p.LineTotal.ToString("N2")</strong>
+                                </li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p class="text-muted small">No parts logged yet.</p>
+                    }
+                </div>
+
+                <div>
+                    <h6 class="fw-semibold small text-muted text-uppercase">Work Logged (@Model.TotalLaborHours hrs)</h6>
+                    @if (Model.WorkLogs.Any())
+                    {
+                        <ul class="list-group list-group-flush small">
+                            @foreach (var w in Model.WorkLogs)
+                            {
+                                <li class="list-group-item px-0 py-1">
+                                    <div class="d-flex justify-content-between">
+                                        <span><strong>@w.TaskDescription</strong></span>
+                                        <span class="badge bg-secondary">@w.HoursSpent hrs</span>
+                                    </div>
+                                    <small class="text-muted">Logged by @w.MechanicName on @w.LoggedAt.ToString("HH:mm")</small>
+                                </li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p class="text-muted small">Technician has not logged tasks yet.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

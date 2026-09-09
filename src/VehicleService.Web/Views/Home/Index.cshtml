@@ -1,0 +1,149 @@
+﻿@{
+    ViewData["Title"] = "Next-Gen Vehicle Service & Fleet Management";
+    var packages = ViewBag.Packages as List<ServicePackage> ?? new List<ServicePackage>();
+    var reviews = ViewBag.Reviews as List<CustomerReviewDto> ?? new List<CustomerReviewDto>();
+}
+
+<!-- Hero Section -->
+<section class="hero-section text-center">
+    <div class="container">
+        <span class="hero-tag"><i class="bi bi-stars"></i> Complete Enterprise Auto & Fleet Cloud</span>
+        <h1 class="display-4 fw-bold mb-3">Precision Automotive Servicing & Intelligent Fleet Management</h1>
+        <p class="lead text-light opacity-75 max-w-700 mx-auto mb-4">
+            End-to-end digital ecosystem for vehicle owners, corporate fleets, workshop technicians, and service centers.
+        </p>
+        <div class="d-flex flex-wrap justify-content-center gap-3">
+            <a asp-controller="Account" asp-action="Register" class="btn btn-primary btn-lg px-4 shadow">
+                <i class="bi bi-calendar-check"></i> Book a Service Today
+            </a>
+            <a asp-controller="Account" asp-action="Login" class="btn btn-outline-light btn-lg px-4">
+                <i class="bi bi-box-arrow-in-right"></i> Sign In to Portal
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- 7 Operational Portals Grid -->
+<div class="container my-5">
+    <div class="text-center mb-5">
+        <h2 class="fw-bold">Role-Specific Operational Portals</h2>
+        <p class="text-muted">Explore dedicated workflow workspaces built for every team member</p>
+    </div>
+
+    <div class="row g-4">
+        <!-- Customer Portal -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 p-4 border-0 shadow-sm">
+                <div class="stat-icon primary mb-3"><i class="bi bi-person-fill"></i></div>
+                <h5 class="fw-bold">Customer Portal</h5>
+                <p class="text-muted small">Register multiple vehicles, book scheduled servicing, track live workshop status, approve repair estimates, pay invoices online, and request roadside assistance.</p>
+                <form asp-controller="Account" asp-action="SwitchRole" method="post" class="mt-auto">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="role" value="Customer" />
+                    <button type="submit" class="btn btn-outline-primary btn-sm w-100">Launch Customer Portal &rarr;</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Service Advisor -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 p-4 border-0 shadow-sm">
+                <div class="stat-icon info mb-3"><i class="bi bi-headset"></i></div>
+                <h5 class="fw-bold">Service Advisor</h5>
+                <p class="text-muted small">Vehicle intake & 40-point health inspection, job card creation, service bay and mechanic assignment, estimate builder, and customer communication.</p>
+                <form asp-controller="Account" asp-action="SwitchRole" method="post" class="mt-auto">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="role" value="ServiceAdvisor" />
+                    <button type="submit" class="btn btn-outline-info btn-sm w-100">Launch Advisor Desk &rarr;</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Mechanic -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 p-4 border-0 shadow-sm">
+                <div class="stat-icon warning mb-3"><i class="bi bi-wrench-adjustable"></i></div>
+                <h5 class="fw-bold">Mechanic / Technician</h5>
+                <p class="text-muted small">Assigned jobs dashboard, step-by-step repair checklists, labor hours recording, spare parts consumption from stock, and before/after inspections.</p>
+                <form asp-controller="Account" asp-action="SwitchRole" method="post" class="mt-auto">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="role" value="Mechanic" />
+                    <button type="submit" class="btn btn-outline-warning btn-sm w-100">Launch Mechanic Workstation &rarr;</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Inventory Manager -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 p-4 border-0 shadow-sm">
+                <div class="stat-icon success mb-3"><i class="bi bi-boxes"></i></div>
+                <h5 class="fw-bold">Inventory Manager</h5>
+                <p class="text-muted small">Spare parts inventory, real-time stock reservations, concurrency-safe consumption, low-stock reorder triggers, and stock movement ledger.</p>
+                <form asp-controller="Account" asp-action="SwitchRole" method="post" class="mt-auto">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="role" value="InventoryManager" />
+                    <button type="submit" class="btn btn-outline-success btn-sm w-100">Launch Inventory Portal &rarr;</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Finance Manager -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 p-4 border-0 shadow-sm">
+                <div class="stat-icon primary mb-3"><i class="bi bi-cash-stack"></i></div>
+                <h5 class="fw-bold">Finance Team</h5>
+                <p class="text-muted small">Automated itemized invoicing (services, labor, parts, GST/VAT), mock payment gateway reconciliation, idempotency callbacks, refunds, and revenue analytics.</p>
+                <form asp-controller="Account" asp-action="SwitchRole" method="post" class="mt-auto">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="role" value="FinanceManager" />
+                    <button type="submit" class="btn btn-outline-primary btn-sm w-100">Launch Finance Portal &rarr;</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Fleet Manager -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 p-4 border-0 shadow-sm">
+                <div class="stat-icon danger mb-3"><i class="bi bi-truck"></i></div>
+                <h5 class="fw-bold">Corporate Fleet Manager</h5>
+                <p class="text-muted small">Manage commercial fleet assets, driver assignments, mileage and calendar preventive maintenance predictions, downtime minimization, and cost analytics.</p>
+                <form asp-controller="Account" asp-action="SwitchRole" method="post" class="mt-auto">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="role" value="FleetManager" />
+                    <button type="submit" class="btn btn-outline-danger btn-sm w-100">Launch Fleet Manager &rarr;</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Curated Service Packages -->
+@if (packages.Any())
+{
+    <section class="py-5 bg-white border-top border-bottom">
+        <div class="container">
+            <div class="text-center mb-5">
+                <h2 class="fw-bold">Popular Curated Service Packages</h2>
+                <p class="text-muted">Save up to 25% with bundled periodic and preventive maintenance</p>
+            </div>
+
+            <div class="row g-4 justify-content-center">
+                @foreach (var pkg in packages)
+                {
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card h-100 p-4 text-center border-primary shadow">
+                            <span class="badge bg-primary text-white w-auto mx-auto mb-3">Save @pkg.SavingsPercent%</span>
+                            <h4 class="fw-bold">@pkg.Name</h4>
+                            <p class="text-muted small">@pkg.Description</p>
+                            <div class="my-3">
+                                <span class="display-6 fw-bold text-primary">₹@pkg.PackagePrice.ToString("N0")</span>
+                                <span class="text-decoration-line-through text-muted ms-2">₹@pkg.OriginalTotalPrice.ToString("N0")</span>
+                            </div>
+                            <a asp-controller="Customer" asp-action="BookService" class="btn btn-primary w-100 mt-auto">Book This Package</a>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </section>
+}

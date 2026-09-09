@@ -1,0 +1,81 @@
+﻿@{
+    ViewData["Title"] = "Create Repair Estimate";
+    var jobCard = ViewBag.JobCard as JobCardDto;
+    var parts = ViewBag.Parts as IReadOnlyList<InventoryPartDto> ?? new List<InventoryPartDto>();
+}
+
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card p-4 shadow border-0">
+                <div class="d-flex align-items-center gap-3 mb-4">
+                    <div class="stat-icon warning"><i class="bi bi-calculator-fill"></i></div>
+                    <div>
+                        <h3 class="fw-bold mb-0">Prepare Repair & Parts Estimate</h3>
+                        <p class="text-muted small mb-0">Job Card: <strong>@jobCard?.JobCardNumber</strong> | Vehicle: @jobCard?.VehicleInfo</p>
+                    </div>
+                </div>
+
+                <form asp-action="CreateEstimate" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="jobCardId" value="@jobCard?.Id" />
+
+                    <div class="table-responsive mb-3">
+                        <table class="table table-bordered align-middle" id="estimateTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Description *</th>
+                                    <th>Type</th>
+                                    <th>Spare Part</th>
+                                    <th style="width: 90px;">Qty</th>
+                                    <th style="width: 140px;">Unit Price (₹)</th>
+                                    <th style="width: 140px;">Labor (₹)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><input type="text" name="items[0].Description" class="form-control" value="General Periodic Service Package Labor" required /></td>
+                                    <td>
+                                        <select name="items[0].ItemType" class="form-select">
+                                            <option value="Labor">Labor</option>
+                                            <option value="Part">Part</option>
+                                        </select>
+                                    </td>
+                                    <td>-</td>
+                                    <td><input type="number" name="items[0].Quantity" class="form-control" value="1" /></td>
+                                    <td><input type="number" name="items[0].UnitPrice" class="form-control" value="0" /></td>
+                                    <td><input type="number" name="items[0].LaborCharges" class="form-control" value="1200" /></td>
+                                </tr>
+                                <tr>
+                                    <td><input type="text" name="items[1].Description" class="form-control" value="Front Ceramic Brake Pad Set Replacement" required /></td>
+                                    <td>
+                                        <select name="items[1].ItemType" class="form-select">
+                                            <option value="Part" selected>Part</option>
+                                            <option value="Labor">Labor</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select name="items[1].InventoryPartId" class="form-select">
+                                            @foreach (var p in parts)
+                                            {
+                                                <option value="@p.Id">@p.Name (@p.PartNumber) - ₹@p.SellingPrice.ToString("N0")</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td><input type="number" name="items[1].Quantity" class="form-control" value="1" /></td>
+                                    <td><input type="number" name="items[1].UnitPrice" class="form-control" value="4500" /></td>
+                                    <td><input type="number" name="items[1].LaborCharges" class="form-control" value="950" /></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                        <a asp-action="JobCardDetails" asp-route-id="@jobCard?.Id" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-warning px-4 fw-semibold"><i class="bi bi-send"></i> Send Estimate to Customer</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

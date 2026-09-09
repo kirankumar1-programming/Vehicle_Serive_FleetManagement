@@ -1,0 +1,167 @@
+﻿@model InvoiceDto
+@{
+    ViewData["Title"] = $"Invoice - {Model.InvoiceNumber}";
+}
+
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <!-- Print / Action Toolbar -->
+            <div class="d-flex justify-content-between align-items-center mb-3 d-print-none">
+                <a asp-action="Invoices" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to Invoices</a>
+                <div class="d-flex gap-2">
+                    <button onclick="window.print()" class="btn btn-outline-dark btn-sm"><i class="bi bi-printer"></i> Print / Save PDF</button>
+                    @if (Model.Status == PaymentStatus.Pending)
+                    {
+                        <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#payModal">
+                            <i class="bi bi-credit-card"></i> Pay Online Now (₹@Model.GrandTotal.ToString("N2"))
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <!-- Invoice Document Card -->
+            <div class="card p-5 shadow-sm border" id="printableInvoice">
+                <div class="d-flex justify-content-between align-items-start border-bottom pb-4 mb-4">
+                    <div>
+                        <h2 class="fw-bold text-primary mb-1"><i class="bi bi-car-front-fill"></i> AutoPro Service Hub</h2>
+                        <p class="text-muted small mb-0">104 Gateway Boulevard, Tech City, Bangalore, 560001</p>
+                        <p class="text-muted small mb-0">GSTIN: 29AAACA1234A1Z5 | Phone: +91 80 4123 4567</p>
+                    </div>
+                    <div class="text-end">
+                        <h4 class="fw-bold font-monospace mb-1">TAX INVOICE</h4>
+                        <div class="badge bg-dark font-monospace fs-6">@Model.InvoiceNumber</div>
+                        <div class="text-muted small mt-1">Date: @Model.IssueDate.ToString("MMM dd, yyyy")</div>
+                    </div>
+                </div>
+
+                <!-- Billed To & Vehicle Info -->
+                <div class="row g-3 mb-4">
+                    <div class="col-6">
+                        <h6 class="fw-bold text-muted text-uppercase small">Billed To:</h6>
+                        <strong>@Model.CustomerName</strong>
+                        <div class="small text-muted">@Model.CustomerEmail</div>
+                        <div class="small text-muted">@Model.CustomerPhone</div>
+                    </div>
+                    <div class="col-6 text-end">
+                        <h6 class="fw-bold text-muted text-uppercase small">Vehicle & Job Card:</h6>
+                        <strong>@Model.VehicleInfo</strong>
+                        <div class="small text-muted font-monospace">Plate: @Model.RegistrationNumber</div>
+                        <div class="small text-muted">Job Card: @Model.JobCardNumber</div>
+                    </div>
+                </div>
+
+                <!-- Itemized Table -->
+                <table class="table table-bordered mb-4">
+                    <thead class="table-light small">
+                        <tr>
+                            <th>Description</th>
+                            <th>Category</th>
+                            <th class="text-center">Qty</th>
+                            <th class="text-end">Unit Price</th>
+                            <th class="text-end">Total Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model.Items)
+                        {
+                            <tr>
+                                <td>@item.Description</td>
+                                <td><span class="badge bg-secondary">@item.Category</span></td>
+                                <td class="text-center">@item.Quantity</td>
+                                <td class="text-end">₹@item.UnitPrice.ToString("N2")</td>
+                                <td class="text-end fw-semibold">₹@item.LineTotal.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot class="small">
+                        <tr>
+                            <td colspan="4" class="text-end fw-semibold">Subtotal:</td>
+                            <td class="text-end">₹@Model.SubTotal.ToString("N2")</td>
+                        </tr>
+                        @if (Model.DiscountAmount > 0)
+                        {
+                            <tr class="text-success">
+                                <td colspan="4" class="text-end fw-semibold">Corporate / Promo Discount:</td>
+                                <td class="text-end">-₹@Model.DiscountAmount.ToString("N2")</td>
+                            </tr>
+                        }
+                        <tr>
+                            <td colspan="4" class="text-end fw-semibold">GST Tax (18%):</td>
+                            <td class="text-end">₹@Model.TaxAmount.ToString("N2")</td>
+                        </tr>
+                        <tr class="fs-5 fw-bold text-primary table-primary">
+                            <td colspan="4" class="text-end">Final Amount Due:</td>
+                            <td class="text-end">₹@Model.GrandTotal.ToString("N2")</td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                    <div>
+                        <span class="badge @(Model.Status == PaymentStatus.Successful ? "bg-success" : "bg-warning text-dark") fs-6 px-3 py-2">
+                            Status: @Model.Status
+                        </span>
+                    </div>
+                    <div class="text-muted small">
+                        Thank you for choosing AutoPro Service Network!
+                    </div>
+                </div>
+            </div>
+
+            <!-- Online Payment Modal (Scenario 3 Idempotency) -->
+            <div class="modal fade" id="payModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title fw-bold"><i class="bi bi-shield-lock-fill text-success"></i> Secure Online Payment Gateway</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form asp-action="PayInvoice" method="post">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="InvoiceId" value="@Model.Id" />
+                            <input type="hidden" name="Amount" value="@Model.GrandTotal" />
+                            <div class="modal-body">
+                                <div class="alert alert-light border mb-3">
+                                    <div class="d-flex justify-content-between">
+                                        <span>Invoice:</span> <strong>@Model.InvoiceNumber</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <span>Amount:</span> <strong class="text-primary fs-5">₹@Model.GrandTotal.ToString("N2")</strong>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Payment Method</label>
+                                    <select name="Method" class="form-select">
+                                        <option value="CreditCard">Credit / Debit Card (Visa, Mastercard, RuPay)</option>
+                                        <option value="UPI">UPI Instant Pay (GooglePay, PhonePe, Paytm)</option>
+                                        <option value="NetBanking">Net Banking</option>
+                                        <option value="CorporateAccount">Corporate Fleet Account</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">Cardholder Name / Payer</label>
+                                    <input type="text" name="CardHolderName" class="form-control" value="@Model.CustomerName" required />
+                                </div>
+                                <div class="row g-2">
+                                    <div class="col-8">
+                                        <label class="form-label fw-semibold">Mock Card Number</label>
+                                        <input type="text" class="form-control font-monospace" value="4532 •••• •••• 8899" readonly />
+                                    </div>
+                                    <div class="col-4">
+                                        <label class="form-label fw-semibold">CVV</label>
+                                        <input type="password" class="form-control text-center" value="123" readonly />
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-success fw-semibold px-4">Pay ₹@Model.GrandTotal.ToString("N2") Now</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

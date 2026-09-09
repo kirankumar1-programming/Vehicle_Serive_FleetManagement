@@ -1,0 +1,108 @@
+﻿@model IReadOnlyList<InvoiceDto>
+@{
+    ViewData["Title"] = "Finance & Invoicing Dashboard";
+    var report = ViewBag.RevenueReport as RevenueReportDto;
+}
+
+<div class="container-fluid px-lg-4 my-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-cash-stack text-primary"></i> Finance & Invoicing Command Center</h2>
+            <p class="text-muted small mb-0">Reconcile payments, manage tax invoices, process customer refunds & analyze workshop revenue</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-action="ExportRevenueCsv" class="btn btn-outline-success btn-sm"><i class="bi bi-filetype-csv"></i> Export CSV</a>
+            <a asp-action="RevenueReports" class="btn btn-primary btn-sm"><i class="bi bi-graph-up"></i> Revenue Reports</a>
+        </div>
+    </div>
+
+    <!-- Revenue Stat Widgets -->
+    @if (report != null)
+    {
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card stat-card border-0 shadow-sm">
+                    <div class="stat-icon success"><i class="bi bi-currency-rupee"></i></div>
+                    <div>
+                        <h4 class="fw-bold mb-0">₹@report.TotalRevenue.ToString("N0")</h4>
+                        <div class="text-muted small">Total Revenue Collected</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card border-0 shadow-sm">
+                    <div class="stat-icon primary"><i class="bi bi-tools"></i></div>
+                    <div>
+                        <h4 class="fw-bold mb-0">₹@report.PartsRevenue.ToString("N0")</h4>
+                        <div class="text-muted small">Parts Revenue</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card border-0 shadow-sm">
+                    <div class="stat-icon info"><i class="bi bi-person-workspace"></i></div>
+                    <div>
+                        <h4 class="fw-bold mb-0">₹@report.LaborRevenue.ToString("N0")</h4>
+                        <div class="text-muted small">Labor Revenue</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card border-0 shadow-sm">
+                    <div class="stat-icon warning"><i class="bi bi-clock-history"></i></div>
+                    <div>
+                        <h4 class="fw-bold mb-0">₹@report.OutstandingAmount.ToString("N0")</h4>
+                        <div class="text-muted small">Pending Receivables (@report.PendingInvoicesCount inv)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Invoices Table -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="fw-bold">All Invoices</span>
+            <div class="d-flex gap-1">
+                <a asp-action="Index" class="btn btn-sm btn-outline-secondary">All</a>
+                <a asp-action="Index" asp-route-status="@PaymentStatus.Pending" class="btn btn-sm btn-outline-warning">Pending</a>
+                <a asp-action="Index" asp-route-status="@PaymentStatus.Successful" class="btn btn-sm btn-outline-success">Paid</a>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-custom mb-0">
+                <thead>
+                    <tr>
+                        <th>Invoice #</th>
+                        <th>Job Card</th>
+                        <th>Customer</th>
+                        <th>Vehicle</th>
+                        <th>Issue Date</th>
+                        <th>Grand Total</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var inv in Model)
+                    {
+                        <tr>
+                            <td class="fw-bold font-monospace text-primary">@inv.InvoiceNumber</td>
+                            <td>@inv.JobCardNumber</td>
+                            <td>@inv.CustomerName</td>
+                            <td>@inv.VehicleInfo</td>
+                            <td>@inv.IssueDate.ToString("yyyy-MM-dd")</td>
+                            <td class="fw-bold">₹@inv.GrandTotal.ToString("N2")</td>
+                            <td><span class="badge @(inv.Status == PaymentStatus.Successful ? "bg-success" : "bg-warning text-dark") fs-6">@inv.Status</span></td>
+                            <td>
+                                <a asp-action="InvoiceDetails" asp-route-id="@inv.Id" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i> Details
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

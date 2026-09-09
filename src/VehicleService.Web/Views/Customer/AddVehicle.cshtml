@@ -1,0 +1,81 @@
+﻿@model CreateVehicleDto
+@{
+    ViewData["Title"] = "Register Vehicle";
+}
+
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card p-4 shadow border-0">
+                <div class="d-flex align-items-center gap-3 mb-4">
+                    <div class="stat-icon primary"><i class="bi bi-car-front-fill"></i></div>
+                    <div>
+                        <h3 class="fw-bold mb-0">Register New Vehicle</h3>
+                        <p class="text-muted small mb-0">Add your car to schedule services, track warranties, and view invoices</p>
+                    </div>
+                </div>
+
+                <div asp-validation-summary="All" class="text-danger small mb-3"></div>
+
+                <form asp-action="AddVehicle" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Registration / License Plate Number *</label>
+                            <input asp-for="RegistrationNumber" class="form-control text-uppercase" placeholder="e.g. KA01MJ4589" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Vehicle Identification Number (VIN) *</label>
+                            <input asp-for="VIN" class="form-control text-uppercase" placeholder="17-digit VIN" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Make / Brand *</label>
+                            <input asp-for="Make" class="form-control" placeholder="e.g. Hyundai, Toyota, Tata" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Model *</label>
+                            <input asp-for="Model" class="form-control" placeholder="e.g. Creta, Innova, Nexon" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Variant / Trim</label>
+                            <input asp-for="Variant" class="form-control" placeholder="e.g. SX (O), ZX" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Manufacturing Year</label>
+                            <input asp-for="ManufacturingYear" type="number" class="form-control" value="2023" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Color</label>
+                            <input asp-for="Color" class="form-control" placeholder="e.g. White, Grey, Black" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Current Mileage (KM) *</label>
+                            <input asp-for="CurrentMileage" type="number" class="form-control" value="15000" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Fuel Type</label>
+                            <select asp-for="FuelType" class="form-select" asp-items="Html.GetEnumSelectList<VehicleFuelType>()"></select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Transmission</label>
+                            <select asp-for="Transmission" class="form-select" asp-items="Html.GetEnumSelectList<TransmissionType>()"></select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Insurance Provider</label>
+                            <input asp-for="InsuranceProvider" class="form-control" placeholder="e.g. HDFC ERGO, ICICI Lombard" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Policy Number</label>
+                            <input asp-for="InsurancePolicyNumber" class="form-control" placeholder="POL-123456" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                        <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary px-4"><i class="bi bi-check-circle"></i> Save Vehicle</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

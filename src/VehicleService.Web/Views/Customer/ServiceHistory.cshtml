@@ -1,0 +1,92 @@
+﻿@model IReadOnlyList<JobCardDto>
+@{
+    ViewData["Title"] = "Vehicle Service History";
+    var vehicles = ViewBag.Vehicles as IReadOnlyList<VehicleDto> ?? new List<VehicleDto>();
+    var selectedVehicleId = ViewBag.SelectedVehicleId as int?;
+}
+
+<div class="container-fluid px-lg-4 my-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">Service History</h2>
+            <p class="text-muted small mb-0">Detailed historical record of periodic maintenance, parts replaced, and technician notes</p>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <span class="small text-muted">Filter Vehicle:</span>
+            <select class="form-select form-select-sm" onchange="location = this.value;">
+                <option value="@Url.Action("ServiceHistory")">All Vehicles</option>
+                @foreach (var v in vehicles)
+                {
+                    <option value="@Url.Action("ServiceHistory", new { vehicleId = v.Id })" selected="@(selectedVehicleId == v.Id)">
+                        @v.Make @v.Model (@v.RegistrationNumber)
+                    </option>
+                }
+            </select>
+        </div>
+    </div>
+
+    @if (Model.Any())
+    {
+        <div class="row g-4">
+            @foreach (var job in Model)
+            {
+                <div class="col-12">
+                    <div class="card p-4 border-0 shadow-sm">
+                        <div class="d-flex flex-wrap justify-content-between align-items-start border-bottom pb-3 mb-3">
+                            <div>
+                                <span class="badge bg-primary font-monospace fs-6">@job.JobCardNumber</span>
+                                <h4 class="fw-bold mb-1 mt-2">@job.VehicleInfo</h4>
+                                <span class="text-muted small"><i class="bi bi-calendar"></i> Completed on @job.WorkCompletedAt?.ToString("MMM dd, yyyy") | Odometer: <strong>@job.OdometerIn.ToString("N0") KM</strong></span>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-success fs-6"><i class="bi bi-check-circle"></i> Completed</span>
+                                @if (job.InvoiceId.HasValue)
+                                {
+                                    <div class="mt-2">
+                                        <a asp-action="ViewInvoice" asp-route-id="@job.InvoiceId" class="btn btn-outline-primary btn-sm">
+                                            <i class="bi bi-receipt"></i> Invoice
+                                        </a>
+                                        <a asp-action="ReviewService" asp-route-jobCardId="@job.Id" class="btn btn-warning btn-sm">
+                                            <i class="bi bi-star"></i> Rate Service
+                                        </a>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <h6 class="fw-bold small text-muted text-uppercase">Replaced Parts</h6>
+                                @if (job.ConsumedParts.Any())
+                                {
+                                    <ul class="list-unstyled small mb-0">
+                                        @foreach (var p in job.ConsumedParts)
+                                        {
+                                            <li><i class="bi bi-box-seam text-secondary"></i> @p.PartName (@p.PartNumber) - Qty: @p.Quantity</li>
+                                        }
+                                    </ul>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">Standard inspection & service fluids.</span>
+                                }
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="fw-bold small text-muted text-uppercase">Advisor & QC Notes</h6>
+                                <p class="small text-secondary mb-0">@(job.QualityCheckNotes ?? job.AdvisorObservations ?? "All 40 diagnostic points tested and passed.")</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="card p-5 text-center border-0 shadow-sm">
+            <i class="bi bi-clock-history fs-1 text-muted mb-3"></i>
+            <h4>No completed service records yet</h4>
+            <p class="text-muted">Once your vehicle servicing is completed, records and replaced parts will appear here.</p>
+        </div>
+    }
+</div>

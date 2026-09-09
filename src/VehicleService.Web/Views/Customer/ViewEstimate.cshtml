@@ -1,0 +1,121 @@
+﻿@model RepairEstimateDto
+@{
+    ViewData["Title"] = $"Repair Estimate - {Model.EstimateNumber}";
+}
+
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card p-4 shadow border-0">
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+                    <div>
+                        <span class="badge bg-primary font-monospace fs-6">@Model.EstimateNumber</span>
+                        <h3 class="fw-bold mb-0 mt-2">Repair & Parts Estimate</h3>
+                        <p class="text-muted small mb-0">Vehicle: <strong>@Model.VehicleInfo</strong> | Prepared by: @Model.PreparedByName</p>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge @(Model.ApprovalStatus == EstimateApprovalStatus.Approved ? "bg-success" : (Model.ApprovalStatus == EstimateApprovalStatus.Rejected ? "bg-danger" : "bg-warning text-dark")) fs-6 px-3 py-2">
+                            @Model.ApprovalStatus
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Estimate Table -->
+                <div class="table-responsive mb-4">
+                    <table class="table table-bordered align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Item Description</th>
+                                <th>Type</th>
+                                <th class="text-center">Qty</th>
+                                <th class="text-end">Unit Price</th>
+                                <th class="text-end">Labor</th>
+                                <th class="text-end">Total (Inc. Tax)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{ int idx = 1; }
+                            @foreach (var item in Model.Items)
+                            {
+                                <tr>
+                                    <td>@idx++</td>
+                                    <td>
+                                        <strong>@item.Description</strong>
+                                        @if (!string.IsNullOrEmpty(item.PartNumber))
+                                        {
+                                            <span class="badge bg-light text-dark border ms-1 font-monospace">@item.PartNumber</span>
+                                        }
+                                    </td>
+                                    <td><span class="badge bg-secondary">@item.ItemType</span></td>
+                                    <td class="text-center">@item.Quantity</td>
+                                    <td class="text-end">₹@item.UnitPrice.ToString("N2")</td>
+                                    <td class="text-end">₹@item.LaborCharges.ToString("N2")</td>
+                                    <td class="text-end fw-bold">₹@item.LineTotal.ToString("N2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <td colspan="6" class="text-end fw-semibold">Parts Subtotal:</td>
+                                <td class="text-end">₹@Model.TotalPartsCost.ToString("N2")</td>
+                            </tr>
+                            <tr>
+                                <td colspan="6" class="text-end fw-semibold">Labor Subtotal:</td>
+                                <td class="text-end">₹@Model.TotalLaborCost.ToString("N2")</td>
+                            </tr>
+                            <tr>
+                                <td colspan="6" class="text-end fw-semibold">Taxes (GST 18%):</td>
+                                <td class="text-end">₹@Model.TaxAmount.ToString("N2")</td>
+                            </tr>
+                            <tr class="fs-5 fw-bold text-primary table-primary">
+                                <td colspan="6" class="text-end">Grand Total:</td>
+                                <td class="text-end">₹@Model.GrandTotal.ToString("N2")</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- Customer Approval / Rejection Actions (Scenario 4) -->
+                @if (Model.ApprovalStatus == EstimateApprovalStatus.Pending || Model.ApprovalStatus == EstimateApprovalStatus.ClarificationRequested)
+                {
+                    <div class="card bg-light p-4 border mt-3">
+                        <h5 class="fw-bold mb-3"><i class="bi bi-shield-check text-primary"></i> Customer Approval Decision</h5>
+                        <p class="text-muted small">You can approve the full estimate or reject additional work. In case of rejection, our workshop will proceed exclusively with the basic scheduled maintenance services.</p>
+
+                        <div class="d-flex flex-wrap gap-3 mt-2">
+                            <!-- Approve All -->
+                            <form asp-action="RespondToEstimate" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="EstimateId" value="@Model.Id" />
+                                <input type="hidden" name="Action" value="@EstimateApprovalStatus.Approved" />
+                                <input type="hidden" name="CustomerNotes" value="Full estimate approved by customer." />
+                                <button type="submit" class="btn btn-success px-4 py-2 fw-semibold">
+                                    <i class="bi bi-check-circle"></i> Approve All Work & Proceed
+                                </button>
+                            </form>
+
+                            <!-- Reject Additional Repairs (Scenario 4) -->
+                            <form asp-action="RespondToEstimate" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="EstimateId" value="@Model.Id" />
+                                <input type="hidden" name="Action" value="@EstimateApprovalStatus.Rejected" />
+                                <input type="hidden" name="CustomerNotes" value="Customer rejected additional estimate repairs. Proceed only with base service." />
+                                <button type="submit" class="btn btn-outline-danger px-4 py-2" onclick="return confirm('Are you sure you want to decline additional repairs? The workshop will proceed with basic scheduled maintenance only.')">
+                                    <i class="bi bi-x-circle"></i> Reject Additional Work
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-success mt-3 d-flex align-items-center gap-2">
+                        <i class="bi bi-check-circle-fill fs-5"></i>
+                        <div>Estimate status is <strong>@Model.ApprovalStatus</strong>. Customer response recorded: <em>@Model.CustomerNotes</em></div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

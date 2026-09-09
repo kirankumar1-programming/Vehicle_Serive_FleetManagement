@@ -1,0 +1,106 @@
+﻿@{
+    ViewData["Title"] = "Service Advisor Workspace";
+    var todayAppts = ViewBag.TodayAppointments as List<AppointmentDto> ?? new List<AppointmentDto>();
+    var activeJobs = ViewBag.ActiveJobs as List<JobCardDto> ?? new List<JobCardDto>();
+    var pendingEstimates = ViewBag.PendingEstimates as List<JobCardDto> ?? new List<JobCardDto>();
+    var readyForDelivery = ViewBag.ReadyForDelivery as List<JobCardDto> ?? new List<JobCardDto>();
+}
+
+<div class="container-fluid px-lg-4 my-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-headset text-primary"></i> Service Advisor Command Desk</h2>
+            <p class="text-muted small mb-0">Manage vehicle check-ins, multi-point health inspections, repair estimates & customer communication</p>
+        </div>
+        <a asp-action="Appointments" class="btn btn-primary"><i class="bi bi-calendar-check"></i> View Today's Schedule</a>
+    </div>
+
+    <!-- Stat KPI Widgets -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card border-0 shadow-sm">
+                <div class="stat-icon primary"><i class="bi bi-calendar-date"></i></div>
+                <div>
+                    <h3 class="fw-bold mb-0">@todayAppts.Count</h3>
+                    <div class="text-muted small">Today's Bookings</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-0 shadow-sm">
+                <div class="stat-icon warning"><i class="bi bi-calculator"></i></div>
+                <div>
+                    <h3 class="fw-bold mb-0">@pendingEstimates.Count</h3>
+                    <div class="text-muted small">Estimates Pending</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-0 shadow-sm">
+                <div class="stat-icon info"><i class="bi bi-wrench-adjustable"></i></div>
+                <div>
+                    <h3 class="fw-bold mb-0">@activeJobs.Count</h3>
+                    <div class="text-muted small">Active Workshop Jobs</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card border-0 shadow-sm">
+                <div class="stat-icon success"><i class="bi bi-check2-all"></i></div>
+                <div>
+                    <h3 class="fw-bold mb-0">@readyForDelivery.Count</h3>
+                    <div class="text-muted small">Ready for Pick-Up</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Workshop Queue -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="fw-bold"><i class="bi bi-list-task text-primary"></i> Live Workshop Job Cards</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-custom mb-0">
+                <thead>
+                    <tr>
+                        <th>Job Card #</th>
+                        <th>Vehicle</th>
+                        <th>Customer</th>
+                        <th>Assigned Bay</th>
+                        <th>Assigned Mechanic</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (activeJobs.Any())
+                    {
+                        @foreach (var j in activeJobs)
+                        {
+                            <tr>
+                                <td class="fw-bold font-monospace text-primary">@j.JobCardNumber</td>
+                                <td><strong>@j.VehicleInfo</strong></td>
+                                <td>@j.CustomerName (@j.CustomerPhone)</td>
+                                <td><span class="badge bg-light text-dark border">@(j.ServiceBayName ?? "Unassigned")</span></td>
+                                <td>@(j.MechanicName ?? "Unassigned")</td>
+                                <td>
+                                    <span class="badge-status @j.Status.ToString().ToLower()">@j.Status</span>
+                                </td>
+                                <td>
+                                    <a asp-action="JobCardDetails" asp-route-id="@j.Id" class="btn btn-sm btn-primary">
+                                        <i class="bi bi-gear"></i> Manage Job
+                                    </a>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr><td colspan="7" class="text-center py-4 text-muted">No active workshop jobs.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,288 @@
+﻿@using System.Security.Claims
+@using VehicleService.Domain.Enums
+
+@{
+    var isAuthenticated = User.Identity?.IsAuthenticated == true;
+    var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Guest";
+    var userName = User.FindFirstValue(ClaimTypes.Name) ?? User.Identity?.Name ?? "User";
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - AutoPro Fleet & Service Hub</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/css/site.css" />
+</head>
+<body>
+    <!-- Quick Demo Role Switcher Toolbar -->
+    <div class="demo-role-bar d-flex flex-wrap align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-2 mb-1 mb-md-0">
+            <span class="badge bg-primary text-white"><i class="bi bi-shield-check"></i> 1-Click Role Switcher</span>
+            <span class="text-secondary small d-none d-lg-inline">Switch instant demo logins:</span>
+        </div>
+        <div class="d-flex flex-wrap gap-1 align-items-center">
+            <form asp-controller="Account" asp-action="SwitchRole" method="post" class="d-inline">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="role" value="Customer" />
+                <button type="submit" class="demo-role-btn @(userRole == "Customer" ? "active" : "")">
+                    <i class="bi bi-person"></i> Customer
+                </button>
+            </form>
+            <form asp-controller="Account" asp-action="SwitchRole" method="post" class="d-inline">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="role" value="ServiceAdvisor" />
+                <button type="submit" class="demo-role-btn @(userRole == "ServiceAdvisor" ? "active" : "")">
+                    <i class="bi bi-headset"></i> Service Advisor
+                </button>
+            </form>
+            <form asp-controller="Account" asp-action="SwitchRole" method="post" class="d-inline">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="role" value="Mechanic" />
+                <button type="submit" class="demo-role-btn @(userRole == "Mechanic" ? "active" : "")">
+                    <i class="bi bi-wrench-adjustable"></i> Mechanic
+                </button>
+            </form>
+            <form asp-controller="Account" asp-action="SwitchRole" method="post" class="d-inline">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="role" value="InventoryManager" />
+                <button type="submit" class="demo-role-btn @(userRole == "InventoryManager" ? "active" : "")">
+                    <i class="bi bi-boxes"></i> Inventory
+                </button>
+            </form>
+            <form asp-controller="Account" asp-action="SwitchRole" method="post" class="d-inline">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="role" value="FinanceManager" />
+                <button type="submit" class="demo-role-btn @(userRole == "FinanceManager" ? "active" : "")">
+                    <i class="bi bi-cash-stack"></i> Finance
+                </button>
+            </form>
+            <form asp-controller="Account" asp-action="SwitchRole" method="post" class="d-inline">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="role" value="FleetManager" />
+                <button type="submit" class="demo-role-btn @(userRole == "FleetManager" ? "active" : "")">
+                    <i class="bi bi-truck"></i> Fleet
+                </button>
+            </form>
+            <form asp-controller="Account" asp-action="SwitchRole" method="post" class="d-inline">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="role" value="Administrator" />
+                <button type="submit" class="demo-role-btn @(userRole == "Administrator" ? "active" : "")">
+                    <i class="bi bi-gear-wide-connected"></i> Admin
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-custom sticky-top">
+        <div class="container-fluid px-lg-4">
+            <a class="navbar-brand" asp-controller="Home" asp-action="Index">
+                <i class="bi bi-car-front-fill fs-4 text-primary"></i>
+                <span>AutoPro<span class="text-primary">Fleet</span></span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarContent">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    @if (isAuthenticated)
+                    {
+                        if (userRole == "Customer")
+                        {
+                            <li class="nav-item"><a class="nav-link" asp-controller="Customer" asp-action="Index"><i class="bi bi-speedometer2"></i> My Garage</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Customer" asp-action="BookService"><i class="bi bi-calendar-plus"></i> Book Service</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Customer" asp-action="Appointments"><i class="bi bi-clock-history"></i> Appointments</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Customer" asp-action="Invoices"><i class="bi bi-receipt"></i> Invoices</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Customer" asp-action="Warranties"><i class="bi bi-shield-check"></i> Warranties</a></li>
+                            <li class="nav-item"><a class="nav-link text-danger" asp-controller="Customer" asp-action="Roadside"><i class="bi bi-geo-alt-fill"></i> Roadside Help</a></li>
+                        }
+                        else if (userRole == "ServiceAdvisor")
+                        {
+                            <li class="nav-item"><a class="nav-link" asp-controller="ServiceAdvisor" asp-action="Index"><i class="bi bi-speedometer2"></i> Advisor Desk</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="ServiceAdvisor" asp-action="Appointments"><i class="bi bi-calendar-check"></i> Daily Bookings</a></li>
+                        }
+                        else if (userRole == "Mechanic")
+                        {
+                            <li class="nav-item"><a class="nav-link" asp-controller="Mechanic" asp-action="Index"><i class="bi bi-wrench"></i> My Assigned Jobs</a></li>
+                        }
+                        else if (userRole == "InventoryManager")
+                        {
+                            <li class="nav-item"><a class="nav-link" asp-controller="Inventory" asp-action="Index"><i class="bi bi-boxes"></i> Spare Parts Catalog</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Inventory" asp-action="LowStock"><i class="bi bi-exclamation-triangle"></i> Low Stock Alerts</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Inventory" asp-action="Transactions"><i class="bi bi-arrow-left-right"></i> Stock Movements</a></li>
+                        }
+                        else if (userRole == "FinanceManager")
+                        {
+                            <li class="nav-item"><a class="nav-link" asp-controller="Finance" asp-action="Index"><i class="bi bi-receipt-cutoff"></i> Invoices & Billing</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Finance" asp-action="RevenueReports"><i class="bi bi-graph-up-arrow"></i> Revenue Analytics</a></li>
+                        }
+                        else if (userRole == "FleetManager")
+                        {
+                            <li class="nav-item"><a class="nav-link" asp-controller="Fleet" asp-action="Index"><i class="bi bi-speedometer2"></i> Fleet Dashboard</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Fleet" asp-action="Vehicles"><i class="bi bi-truck"></i> Fleet Vehicles</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Fleet" asp-action="PreventiveMaintenance"><i class="bi bi-tools"></i> Maintenance Due</a></li>
+                        }
+                        else if (userRole == "Administrator")
+                        {
+                            <li class="nav-item"><a class="nav-link" asp-controller="Admin" asp-action="Index"><i class="bi bi-cpu"></i> System Overview</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Admin" asp-action="Users"><i class="bi bi-people"></i> Users & Roles</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Admin" asp-action="ServiceCenters"><i class="bi bi-building"></i> Centers & Bays</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Admin" asp-action="ServiceCatalog"><i class="bi bi-journal-text"></i> Service Catalog</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Admin" asp-action="Coupons"><i class="bi bi-tag"></i> Coupons</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Admin" asp-action="AuditLogs"><i class="bi bi-fingerprint"></i> Audit Trail</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Admin" asp-action="Reviews"><i class="bi bi-star"></i> Reviews</a></li>
+                        }
+                    }
+                    else
+                    {
+                        <li class="nav-item"><a class="nav-link" asp-controller="Home" asp-action="Index">Home</a></li>
+                    }
+                </ul>
+
+                <ul class="navbar-nav ms-auto align-items-center gap-2">
+                    @if (isAuthenticated)
+                    {
+                        <!-- Notification Bell -->
+                        <li class="nav-item dropdown">
+                            <a class="nav-link position-relative" href="#" id="notifDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-bell fs-5"></i>
+                                <span class="position-absolute top-1 start-100 translate-middle p-1 bg-danger border border-light rounded-circle" id="notifBadge"></span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-lg" style="width: 320px;" aria-labelledby="notifDropdown" id="notifMenu">
+                                <li class="p-2 border-bottom fw-bold small d-flex justify-content-between align-items-center">
+                                    <span>Notifications</span>
+                                    <button class="btn btn-link btn-sm p-0 text-decoration-none" onclick="markAllNotificationsRead()">Mark all read</button>
+                                </li>
+                                <li id="notifListContainer" class="p-2 text-muted small text-center">Loading alerts...</li>
+                            </ul>
+                        </li>
+
+                        <!-- User Profile Dropdown -->
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" role="button" data-bs-toggle="dropdown">
+                                <span class="badge bg-light text-dark border"><i class="bi bi-person-badge"></i> @userRole</span>
+                                <span class="fw-semibold">@userName</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end shadow">
+                                <li><span class="dropdown-item-text text-muted small">Signed in as <strong>@userName</strong></span></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <form asp-controller="Account" asp-action="Logout" method="post">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="dropdown-item text-danger"><i class="bi bi-box-arrow-right"></i> Sign Out</button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </li>
+                    }
+                    else
+                    {
+                        <li class="nav-item"><a class="btn btn-outline-primary btn-sm" asp-controller="Account" asp-action="Login"><i class="bi bi-box-arrow-in-right"></i> Sign In</a></li>
+                        <li class="nav-item"><a class="btn btn-primary btn-sm" asp-controller="Account" asp-action="Register"><i class="bi bi-person-plus"></i> Register</a></li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Flash Messages -->
+    <div class="container-fluid px-lg-4 mt-3">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success alert-dismissible fade show d-flex align-items-center gap-2 shadow-sm" role="alert">
+                <i class="bi bi-check-circle-fill fs-5"></i>
+                <div>@TempData["SuccessMessage"]</div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center gap-2 shadow-sm" role="alert">
+                <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+                <div>@TempData["ErrorMessage"]</div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+    </div>
+
+    <!-- Page Content -->
+    <main role="main" class="pb-5">
+        @RenderBody()
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container-fluid px-lg-4 text-center">
+            <div class="d-flex flex-wrap justify-content-between align-items-center">
+                <div class="fw-semibold">
+                    <i class="bi bi-car-front text-primary"></i> AutoPro Vehicle Service & Fleet Management System
+                </div>
+                <div class="small">
+                    &copy; 2026 AutoPro Technologies. ASP.NET Core & Azure SQL Ready.
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Notification Dropdown Loader
+        document.addEventListener("DOMContentLoaded", function () {
+            fetchNotifications();
+        });
+
+        function fetchNotifications() {
+            fetch('/Notifications/GetNotifications')
+                .then(res => res.json())
+                .then(data => {
+                    const container = document.getElementById('notifListContainer');
+                    const badge = document.getElementById('notifBadge');
+                    if (!container) return;
+
+                    if (!data || data.length === 0) {
+                        container.innerHTML = '<div class="p-3 text-muted">No unread notifications</div>';
+                        if (badge) badge.style.display = 'none';
+                        return;
+                    }
+
+                    const unreadCount = data.filter(n => !n.isRead).length;
+                    if (badge) {
+                        badge.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+                    }
+
+                    let html = '';
+                    data.forEach(n => {
+                        html += `
+                            <div class="p-2 border-bottom ${n.isRead ? 'text-muted bg-light' : 'fw-semibold'}">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-primary">${n.title}</small>
+                                </div>
+                                <div class="small">${n.message}</div>
+                                ${n.actionUrl ? `<a href="${n.actionUrl}" class="btn btn-sm btn-link p-0 small">View Details &rarr;</a>` : ''}
+                            </div>
+                        `;
+                    });
+                    container.innerHTML = html;
+                })
+                .catch(() => {});
+        }
+
+        function markAllNotificationsRead() {
+            fetch('/Notifications/MarkAllAsRead', { method: 'POST' })
+                .then(() => fetchNotifications());
+        }
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

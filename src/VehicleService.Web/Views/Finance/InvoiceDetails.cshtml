@@ -1,0 +1,119 @@
+﻿@model InvoiceDto
+@{
+    ViewData["Title"] = $"Invoice Audit - {Model.InvoiceNumber}";
+}
+
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <a asp-action="Index" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to Invoices</a>
+                @if (Model.Status == PaymentStatus.Successful)
+                {
+                    <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#refundModal">
+                        <i class="bi bi-arrow-counterclockwise"></i> Process Refund
+                    </button>
+                }
+            </div>
+
+            <div class="card p-5 border-0 shadow">
+                <div class="d-flex justify-content-between align-items-start border-bottom pb-3 mb-4">
+                    <div>
+                        <h3 class="fw-bold text-primary mb-1">Invoice @Model.InvoiceNumber</h3>
+                        <p class="text-muted small mb-0">Job Card: <strong>@Model.JobCardNumber</strong> | Vehicle: @Model.VehicleInfo (@Model.RegistrationNumber)</p>
+                    </div>
+                    <span class="badge @(Model.Status == PaymentStatus.Successful ? "bg-success" : "bg-warning text-dark") fs-5 px-3 py-2">
+                        @Model.Status
+                    </span>
+                </div>
+
+                <!-- Financial Summary -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3 p-3 bg-light rounded text-center">
+                        <small class="text-muted d-block">Services Total</small>
+                        <strong class="fs-5">₹@Model.ServicesTotal.ToString("N2")</strong>
+                    </div>
+                    <div class="col-md-3 p-3 bg-light rounded text-center">
+                        <small class="text-muted d-block">Parts Total</small>
+                        <strong class="fs-5">₹@Model.PartsTotal.ToString("N2")</strong>
+                    </div>
+                    <div class="col-md-3 p-3 bg-light rounded text-center">
+                        <small class="text-muted d-block">Labor Total</small>
+                        <strong class="fs-5">₹@Model.LaborTotal.ToString("N2")</strong>
+                    </div>
+                    <div class="col-md-3 p-3 bg-light rounded text-center">
+                        <small class="text-muted d-block">Grand Total</small>
+                        <strong class="fs-5 text-primary">₹@Model.GrandTotal.ToString("N2")</strong>
+                    </div>
+                </div>
+
+                <!-- Payment Transactions History -->
+                <h5 class="fw-bold mb-3"><i class="bi bi-credit-card text-success"></i> Payment Gateway Transactions</h5>
+                @if (Model.Payments.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-bordered small">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Transaction Reference</th>
+                                    <th>Gateway Txn ID</th>
+                                    <th>Method</th>
+                                    <th>Amount</th>
+                                    <th>Processed At</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var p in Model.Payments)
+                                {
+                                    <tr>
+                                        <td class="font-monospace fw-bold">@p.TransactionReference</td>
+                                        <td class="font-monospace">@p.GatewayTransactionId</td>
+                                        <td>@p.Method</td>
+                                        <td class="fw-bold">₹@p.Amount.ToString("N2")</td>
+                                        <td>@p.ProcessedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                        <td><span class="badge bg-success">@p.Status</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted small">No payment transactions recorded for this invoice yet.</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Refund Modal -->
+<div class="modal fade" id="refundModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold text-danger">Process Customer Refund</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="ProcessRefund" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="invoiceId" value="@Model.Id" />
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Refund Amount (₹) *</label>
+                        <input type="number" name="amount" class="form-control" value="@Model.PaidAmount" max="@Model.PaidAmount" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Reason for Refund *</label>
+                        <input type="text" name="reason" class="form-control" placeholder="e.g. Service warranty adjustment, part return" required />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Confirm Refund</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

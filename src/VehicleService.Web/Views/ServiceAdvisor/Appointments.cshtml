@@ -1,0 +1,61 @@
+﻿@model IReadOnlyList<AppointmentDto>
+@{
+    ViewData["Title"] = "Daily Bookings Schedule";
+}
+
+<div class="container-fluid px-lg-4 my-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">Daily Bookings & Intake Queue</h2>
+            <p class="text-muted small mb-0">Check-in arriving customer vehicles and generate official service Job Cards</p>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-custom mb-0">
+                <thead>
+                    <tr>
+                        <th>Appointment #</th>
+                        <th>Vehicle</th>
+                        <th>Customer</th>
+                        <th>Service / Package</th>
+                        <th>Center & Slot</th>
+                        <th>Status</th>
+                        <th>Intake Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var a in Model)
+                    {
+                        <tr>
+                            <td class="fw-bold font-monospace text-primary">@a.AppointmentNumber</td>
+                            <td><strong>@a.VehicleInfo</strong></td>
+                            <td>@a.CustomerName (@a.CustomerPhone)</td>
+                            <td>@(a.ServicePackageName ?? a.ServiceTypeName ?? "Service")</td>
+                            <td>
+                                <div>@a.AppointmentDate.ToString("MMM dd, yyyy")</div>
+                                <small class="text-muted">@a.TimeSlot</small>
+                            </td>
+                            <td><span class="badge-status @a.Status.ToString().ToLower()">@a.Status</span></td>
+                            <td>
+                                @if (a.Status == AppointmentStatus.Confirmed || a.Status == AppointmentStatus.Pending)
+                                {
+                                    <a asp-action="CheckInVehicle" asp-route-appointmentId="@a.Id" class="btn btn-sm btn-success fw-semibold">
+                                        <i class="bi bi-box-arrow-in-right"></i> Check In Vehicle
+                                    </a>
+                                }
+                                else if (a.JobCardId.HasValue)
+                                {
+                                    <a asp-action="JobCardDetails" asp-route-id="@a.JobCardId" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i> View Job Card
+                                    </a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

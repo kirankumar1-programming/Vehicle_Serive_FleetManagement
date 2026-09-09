@@ -1,0 +1,52 @@
+﻿@model IReadOnlyList<VehicleDto>
+@{
+    ViewData["Title"] = "Preventive Maintenance Due";
+}
+
+<div class="container-fluid px-lg-4 my-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1 text-warning"><i class="bi bi-tools"></i> Preventive Maintenance Schedule</h2>
+            <p class="text-muted small mb-0">Commercial vehicles due for periodic servicing based on mileage & time thresholds</p>
+        </div>
+        <a asp-action="Index" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to Dashboard</a>
+    </div>
+
+    @if (Model.Any())
+    {
+        <div class="row g-4">
+            @foreach (var v in Model)
+            {
+                <div class="col-md-6 col-lg-4">
+                    <div class="card p-4 border-warning shadow-sm h-100">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <span class="badge bg-dark font-monospace">@v.RegistrationNumber</span>
+                                <h5 class="fw-bold mt-2 mb-0">@v.Make @v.Model</h5>
+                            </div>
+                            <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle-fill"></i> Maintenance Due</span>
+                        </div>
+                        <div class="small my-2 text-muted">
+                            <div>Current Mileage: <strong>@v.CurrentMileage.ToString("N0") KM</strong></div>
+                            <div>Target Service Due: <strong>@v.NextServiceDueMileage.ToString("N0") KM</strong></div>
+                            <div>Last Service: @(v.LastServiceDate?.ToString("yyyy-MM-dd") ?? "Initial Factory")</div>
+                        </div>
+                        <div class="mt-3 pt-2 border-top">
+                            <a asp-controller="Customer" asp-action="BookService" asp-route-vehicleId="@v.Id" class="btn btn-warning btn-sm w-100 fw-semibold">
+                                <i class="bi bi-calendar-check"></i> Book Immediate Service
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="card p-5 text-center border-0 shadow-sm">
+            <i class="bi bi-shield-check fs-1 text-success mb-2"></i>
+            <h4>All fleet vehicles are compliant</h4>
+            <p class="text-muted">No commercial vehicles are currently overdue for periodic maintenance.</p>
+        </div>
+    }
+</div>

@@ -1,0 +1,66 @@
+﻿@model RevenueReportDto
+@{
+    ViewData["Title"] = "Revenue Analytics & Reports";
+}
+
+<div class="container-fluid px-lg-4 my-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-graph-up-arrow text-primary"></i> Financial Revenue Reports</h2>
+            <p class="text-muted small mb-0">Monthly breakdown, parts vs labor performance, and tax analytics</p>
+        </div>
+        <a asp-action="ExportRevenueCsv" class="btn btn-success btn-sm"><i class="bi bi-download"></i> Export CSV</a>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-8">
+            <div class="card p-4 border-0 shadow-sm">
+                <h5 class="fw-bold mb-3">Monthly Revenue Breakdown</h5>
+                <div class="table-responsive">
+                    <table class="table table-custom mb-0">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>Services Completed</th>
+                                <th>Total Revenue</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var m in Model.MonthlyBreakdown)
+                            {
+                                <tr>
+                                    <td class="fw-bold">@m.MonthName</td>
+                                    <td>@m.ServicesCompleted</td>
+                                    <td class="fw-bold text-success">₹@m.Revenue.ToString("N2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card p-4 border-0 shadow-sm">
+                <h5 class="fw-bold mb-3">Revenue Streams Split</h5>
+                <ul class="list-group list-group-flush small">
+                    <li class="list-group-item d-flex justify-content-between px-0">
+                        <span>Parts Sales:</span> <strong>₹@Model.PartsRevenue.ToString("N2")</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between px-0">
+                        <span>Labor & Workshop:</span> <strong>₹@Model.LaborRevenue.ToString("N2")</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between px-0">
+                        <span>GST Tax Collected:</span> <strong>₹@Model.TaxCollected.ToString("N2")</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between px-0 text-success">
+                        <span>Promotional Discounts:</span> <strong>-₹@Model.TotalDiscounts.ToString("N2")</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between px-0 fw-bold fs-6 text-primary pt-2 border-top">
+                        <span>Net Paid Revenue:</span> <span>₹@Model.TotalRevenue.ToString("N2")</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>

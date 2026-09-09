@@ -1,0 +1,113 @@
+﻿@model IReadOnlyList<RoadsideRequestDto>
+@{
+    ViewData["Title"] = "Emergency Roadside Assistance";
+    var vehicles = ViewBag.Vehicles as IReadOnlyList<VehicleDto> ?? new List<VehicleDto>();
+}
+
+<div class="container-fluid px-lg-4 my-4">
+    <div class="row g-4">
+        <!-- Request New Assistance Card -->
+        <div class="col-lg-5">
+            <div class="card p-4 border-0 shadow-sm">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div class="stat-icon danger"><i class="bi bi-geo-alt-fill"></i></div>
+                    <div>
+                        <h4 class="fw-bold mb-0">24/7 Roadside Assistance</h4>
+                        <p class="text-muted small mb-0">Rapid technician & tow truck dispatch</p>
+                    </div>
+                </div>
+
+                <form asp-action="RequestRoadside" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Select Vehicle</label>
+                        <select name="VehicleId" class="form-select" required>
+                            @foreach (var v in vehicles)
+                            {
+                                <option value="@v.Id">@v.Make @v.Model (@v.RegistrationNumber)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Incident Type</label>
+                        <select name="RequestType" class="form-select" required>
+                            <option value="Breakdown">Mechanical Breakdown / Engine Failure</option>
+                            <option value="FlatTyre">Flat Tyre / Puncture</option>
+                            <option value="BatteryFailure">Battery Dead / Jumpstart Required</option>
+                            <option value="FuelIssue">Out of Fuel / Fuel Contamination</option>
+                            <option value="Towing">Flatbed Towing Required</option>
+                            <option value="Accident">Accident Towing & Recovery</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Current Location / Landmark *</label>
+                        <textarea name="LocationAddress" class="form-control" rows="2" placeholder="e.g. Near Silk Board Flyover Junction, Outer Ring Road, Bangalore" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Emergency Contact Phone *</label>
+                        <input type="text" name="ContactPhone" class="form-control" placeholder="+91 98765 43210" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Describe Issue</label>
+                        <input type="text" name="IssueDescription" class="form-control" placeholder="e.g. Warning lights flashing, car stopped on highway" />
+                    </div>
+
+                    <button type="submit" class="btn btn-danger w-100 py-2 fw-semibold">
+                        <i class="bi bi-broadcast"></i> Dispatch Emergency Assistance
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Active / Recent Assistance Requests -->
+        <div class="col-lg-7">
+            <div class="card p-4 border-0 shadow-sm h-100">
+                <h4 class="fw-bold mb-3"><i class="bi bi-clock-history text-primary"></i> Assistance Requests & Live Dispatch</h4>
+                @if (Model.Any())
+                {
+                    <div class="d-flex flex-column gap-3">
+                        @foreach (var r in Model)
+                        {
+                            <div class="card p-3 border @(r.Status == RoadsideStatus.IssueResolved ? "bg-light" : "border-danger bg-light")">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div>
+                                        <span class="badge bg-dark font-monospace">@r.RequestNumber</span>
+                                        <span class="badge bg-danger ms-1">@r.RequestType</span>
+                                        <h5 class="fw-bold mt-2 mb-0">@r.VehicleInfo</h5>
+                                    </div>
+                                    <span class="badge @(r.Status == RoadsideStatus.IssueResolved ? "bg-success" : "bg-danger") fs-6 px-3 py-1">
+                                        @r.Status
+                                    </span>
+                                </div>
+                                <div class="small text-muted my-1">
+                                    <div><i class="bi bi-geo-alt"></i> Location: <strong>@r.LocationAddress</strong></div>
+                                    <div><i class="bi bi-telephone"></i> Contact: @r.ContactPhone</div>
+                                    @if (!string.IsNullOrEmpty(r.AssignedTechnicianName))
+                                    {
+                                        <div class="text-primary mt-1">
+                                            <i class="bi bi-person-badge"></i> Assigned Patrol: <strong>@r.AssignedTechnicianName</strong> (Phone: @r.AssignedTechnicianPhone) | Tow Truck: <strong>@r.TowTruckPlate</strong>
+                                        </div>
+                                    }
+                                </div>
+                                @if (r.EstimatedArrivalTime.HasValue && r.Status != RoadsideStatus.IssueResolved)
+                                {
+                                    <div class="alert alert-info py-1 px-2 small mt-2 mb-0">
+                                        <i class="bi bi-stopwatch"></i> Estimated Arrival: <strong>@r.EstimatedArrivalTime.Value.ToString("HH:mm")</strong>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-shield-check fs-1 text-success mb-2"></i>
+                        <h5>No roadside emergencies reported</h5>
+                        <p class="small">Our 24/7 rapid roadside network is on standby whenever you need emergency help.</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

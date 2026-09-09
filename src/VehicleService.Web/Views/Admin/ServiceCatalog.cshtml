@@ -1,0 +1,51 @@
+﻿@model IReadOnlyList<ServiceType>
+@{
+    ViewData["Title"] = "Service Catalog & Packages";
+    var packages = ViewBag.Packages as IReadOnlyList<ServicePackage> ?? new List<ServicePackage>();
+}
+
+<div class="container-fluid px-lg-4 my-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-journal-text text-primary"></i> Service Catalog & Bundled Packages</h2>
+            <p class="text-muted small mb-0">Configure periodic maintenance services, standard labor rates, taxes & package discounts</p>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header fw-bold">Individual Service Types</div>
+                <div class="table-responsive">
+                    <table class="table table-custom mb-0">
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Service Name</th>
+                                <th>Category</th>
+                                <th>Duration</th>
+                                <th>Base Price</th>
+                                <th>Labor Charge</th>
+                                <th>Tax</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var s in Model)
+                            {
+                                <tr>
+                                    <td class="fw-bold font-monospace text-primary">@s.Code</td>
+                                    <td><strong>@s.Name</strong></td>
+                                    <td><span class="badge bg-secondary">@s.Category</span></td>
+                                    <td>~@s.EstimatedDurationHours hrs</td>
+                                    <td class="fw-bold">₹@s.BasePrice.ToString("N0")</td>
+                                    <td>₹@s.LaborCharges.ToString("N0")</td>
+                                    <td>@s.ApplicableTaxPercent%</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

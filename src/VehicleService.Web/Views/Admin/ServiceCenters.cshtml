@@ -1,0 +1,46 @@
+﻿@model IReadOnlyList<ServiceCenter>
+@{
+    ViewData["Title"] = "Service Centers & Bays";
+}
+
+<div class="container-fluid px-lg-4 my-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-building text-primary"></i> Service Centers & Bays (Multi-Location)</h2>
+            <p class="text-muted small mb-0">Multi-location capacity, operational hours, and real-time service bay occupancy</p>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        @foreach (var c in Model)
+        {
+            <div class="col-lg-6">
+                <div class="card p-4 border-0 shadow-sm h-100">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <span class="badge bg-primary font-monospace">@c.Code</span>
+                            <h4 class="fw-bold mt-2 mb-0">@c.Name</h4>
+                            <p class="text-muted small mb-0">@c.Address, @c.City</p>
+                        </div>
+                        <span class="badge bg-success">Open (@c.OperatingHours)</span>
+                    </div>
+
+                    <h6 class="fw-bold mt-3 mb-2 small text-muted text-uppercase">Service Bays (@c.ServiceBays.Count total):</h6>
+                    <div class="row g-2">
+                        @foreach (var b in c.ServiceBays)
+                        {
+                            <div class="col-6">
+                                <div class="p-2 border rounded bg-light small d-flex justify-content-between align-items-center">
+                                    <span><strong>@b.BayName</strong></span>
+                                    <span class="badge @(b.Status == BayStatus.Available ? "bg-success" : (b.Status == BayStatus.Occupied ? "bg-warning text-dark" : "bg-danger"))">
+                                        @b.Status
+                                    </span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
