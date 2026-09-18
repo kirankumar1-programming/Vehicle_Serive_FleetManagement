@@ -1,0 +1,118 @@
+@model UpdateServiceBayDto
+@{
+    ViewData["Title"] = $"Add Service Bay - {Model.ServiceCenterName}";
+}
+
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div class="card p-4 shadow border-0">
+                <div class="d-flex align-items-center justify-content-between mb-4 pb-2 border-bottom">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="stat-icon primary p-3 rounded-circle bg-success-subtle text-success">
+                            <i class="bi bi-plus-circle fs-4"></i>
+                        </div>
+                        <div>
+                            <h3 class="fw-bold mb-0">Add New Service Bay</h3>
+                            <p class="text-muted small mb-0">Expand workshop capacity by configuring a new service bay</p>
+                        </div>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(Model.ServiceCenterName))
+                {
+                    <div class="alert alert-light border d-flex align-items-center gap-2 py-2 mb-3">
+                        <i class="bi bi-building text-primary"></i>
+                        <span>Adding to: <strong>@Model.ServiceCenterName</strong></span>
+                    </div>
+                }
+
+                <div asp-validation-summary="All" class="text-danger small mb-3"></div>
+
+                <form asp-action="AddServiceBay" asp-route-centerId="@Model.ServiceCenterId" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="ServiceCenterId" />
+
+                    <!-- Status Banner / Toggle -->
+                    <div class="card bg-light border-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="fw-bold mb-1"><i class="bi bi-power text-primary me-1"></i> Bay Operational Status</h6>
+                                <p class="text-muted small mb-0">
+                                    Set initial operational availability for this bay.
+                                </p>
+                            </div>
+                            <div class="form-check form-switch fs-5">
+                                <input asp-for="IsActive" class="form-check-input cursor-pointer" type="checkbox" role="switch" id="addBayIsActiveSwitch" checked />
+                                <label class="form-check-label fs-6 fw-semibold ms-1" for="addBayIsActiveSwitch">
+                                    Active
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Bay Number / Code *</label>
+                            <input asp-for="BayNumber" class="form-control font-monospace" placeholder="e.g. BAY-106" required />
+                            <span asp-validation-for="BayNumber" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Bay Name *</label>
+                            <input asp-for="BayName" class="form-control" placeholder="e.g. Service Bay #6 (Express)" required />
+                            <span asp-validation-for="BayName" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Bay Type / Specialization</label>
+                            <input asp-for="BayType" class="form-control" list="bayTypeOptions" placeholder="e.g. General, Express, Wheel Alignment" />
+                            <datalist id="bayTypeOptions">
+                                <option value="General Maintenance" />
+                                <option value="Express Service" />
+                                <option value="Wheel Alignment & Balancing" />
+                                <option value="Heavy Repair & Transmission" />
+                                <option value="Painting & Denting" />
+                                <option value="OBD Diagnostics & Electrical" />
+                                <option value="Washing & Detailing" />
+                            </datalist>
+                            <span asp-validation-for="BayType" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Initial Status *</label>
+                            <select asp-for="Status" class="form-select" asp-items="Html.GetEnumSelectList<BayStatus>()"></select>
+                            <span asp-validation-for="Status" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                        <a asp-action="ServiceCenters" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancel
+                        </a>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success px-4">
+                                <i class="bi bi-plus-circle"></i> Add Service Bay
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const switchEl = document.getElementById('addBayIsActiveSwitch');
+            if (switchEl) {
+                switchEl.addEventListener('change', function () {
+                    const label = this.nextElementSibling;
+                    if (label) {
+                        label.textContent = this.checked ? 'Active' : 'Inactive';
+                    }
+                });
+            }
+        });
+    </script>
+}

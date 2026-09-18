@@ -1,4 +1,4 @@
-﻿@model IReadOnlyList<InventoryPartDto>
+@model IReadOnlyList<InventoryPartDto>
 @{
     ViewData["Title"] = "Spare Parts Inventory";
 }
@@ -57,19 +57,30 @@
                         <th>Available Qty</th>
                         <th>Reserved</th>
                         <th>Total Stock</th>
-                        <th>Actions</th>
+                        <th>Status</th>
+                        <th class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var p in Model)
                     {
-                        <tr class="@(p.IsLowStock ? "table-warning" : "")">
+                        <tr class="@(!p.IsActive ? "opacity-75 table-light" : p.IsLowStock ? "table-warning" : "")">
                             <td class="fw-bold font-monospace text-primary">@p.PartNumber</td>
                             <td>
                                 <strong>@p.Name</strong>
                                 <div class="small text-muted">@p.Category | @p.Manufacturer</div>
+                                @if (!string.IsNullOrEmpty(p.CompatibleVehicles) && p.CompatibleVehicles != "All Models")
+                                {
+                                    <div class="small text-muted fst-italic">Fits: @p.CompatibleVehicles</div>
+                                }
                             </td>
-                            <td><span class="badge bg-light text-dark border">@p.WarehouseLocation</span></td>
+                            <td>
+                                <span class="badge bg-light text-dark border">@p.WarehouseLocation</span>
+                                @if (!string.IsNullOrEmpty(p.ServiceCenterName))
+                                {
+                                    <div class="small text-muted mt-1"><i class="bi bi-building"></i> @p.ServiceCenterName</div>
+                                }
+                            </td>
                             <td>
                                 <div>₹@p.SellingPrice.ToString("N0")</div>
                                 <small class="text-muted">Cost: ₹@p.CostPrice.ToString("N0")</small>
@@ -80,12 +91,33 @@
                             <td><span class="badge bg-secondary">@p.ReservedQuantity</span></td>
                             <td class="fw-bold">@p.TotalStock</td>
                             <td>
-                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#adjModal_@p.Id">
-                                    <i class="bi bi-arrow-left-right"></i> Adjust
-                                </button>
+                                @if (p.IsActive)
+                                {
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-check-circle"></i> Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle"><i class="bi bi-pause-circle"></i> Inactive</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a asp-action="EditPart" asp-route-id="@p.Id" class="btn btn-outline-primary" title="Edit Part Details">
+                                        <i class="bi bi-pencil-square"></i> Edit
+                                    </a>
+                                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#adjModal_@p.Id" title="Stock Adjustment">
+                                        <i class="bi bi-arrow-left-right"></i> Adjust
+                                    </button>
+                                    <form asp-action="TogglePartStatus" asp-route-id="@p.Id" method="post" class="d-inline" onsubmit="return confirm('Are you sure you want to @(p.IsActive ? "deactivate" : "activate") part @p.PartNumber?');">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn @(p.IsActive ? "btn-outline-warning" : "btn-outline-success")" title="@(p.IsActive ? "Deactivate" : "Activate")">
+                                            <i class="bi @(p.IsActive ? "bi-pause-circle" : "bi-play-circle")"></i>
+                                        </button>
+                                    </form>
+                                </div>
 
                                 <!-- Stock Adjustment Modal -->
-                                <div class="modal fade" id="adjModal_@p.Id" tabindex="-1">
+                                <div class="modal fade text-start" id="adjModal_@p.Id" tabindex="-1">
                                     <div class="modal-dialog">
                                         <div class="modal-content">
                                             <div class="modal-header">

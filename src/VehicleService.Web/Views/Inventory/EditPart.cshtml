@@ -1,0 +1,182 @@
+﻿@model InventoryPartDto
+@{
+    ViewData["Title"] = $"Edit Spare Part - {Model.PartNumber}";
+    var serviceCenters = ViewBag.ServiceCenters as IReadOnlyList<ServiceCenter> ?? new List<ServiceCenter>();
+}
+
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card p-4 shadow border-0">
+                <div class="d-flex align-items-center justify-content-between mb-4 pb-2 border-bottom">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="stat-icon success p-3 rounded-circle bg-success-subtle text-success">
+                            <i class="bi bi-box-seam fs-4"></i>
+                        </div>
+                        <div>
+                            <h3 class="fw-bold mb-0">Edit Spare Part Inventory</h3>
+                            <p class="text-muted small mb-0">Update SKU specifications, pricing, stock thresholds, supplier, and warehouse bin assignment</p>
+                        </div>
+                    </div>
+                    <span class="badge bg-primary font-monospace fs-6">@Model.PartNumber</span>
+                </div>
+
+                <div asp-validation-summary="All" class="text-danger small mb-3"></div>
+
+                <form asp-action="EditPart" asp-route-id="@Model.Id" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="Id" />
+                    <input type="hidden" asp-for="AvailableQuantity" />
+                    <input type="hidden" asp-for="ReservedQuantity" />
+
+                    <!-- Status & Inventory Summary Banner -->
+                    <div class="card bg-light border-0 p-3 mb-4">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                            <div>
+                                <h6 class="fw-bold mb-1"><i class="bi bi-power text-success me-1"></i> Part Active Status</h6>
+                                <p class="text-muted small mb-0">
+                                    Active parts can be reserved for service job cards and customer repair estimates.
+                                </p>
+                            </div>
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="text-end me-2">
+                                    <div class="small text-muted">Current Stock</div>
+                                    <span class="badge bg-info text-dark">@Model.AvailableQuantity Available</span>
+                                    <span class="badge bg-secondary">@Model.ReservedQuantity Reserved</span>
+                                </div>
+                                <div class="form-check form-switch fs-5">
+                                    <input asp-for="IsActive" class="form-check-input cursor-pointer" type="checkbox" role="switch" id="partIsActiveSwitch" />
+                                    <label class="form-check-label fs-6 fw-semibold ms-1" for="partIsActiveSwitch">
+                                        @(Model.IsActive ? "Active" : "Inactive")
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- Part Number & Name -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Part Number (SKU) *</label>
+                            <input asp-for="PartNumber" class="form-control font-monospace text-uppercase" placeholder="e.g. BP-102" required />
+                            <span asp-validation-for="PartNumber" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold">Part Name *</label>
+                            <input asp-for="Name" class="form-control" placeholder="e.g. Ceramic Front Brake Pad Set" required />
+                            <span asp-validation-for="Name" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Category & Manufacturer -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Category *</label>
+                            <input asp-for="Category" class="form-control" list="categoryOptions" placeholder="e.g. Brakes, Fluids, Engine" required />
+                            <datalist id="categoryOptions">
+                                <option value="Brakes" />
+                                <option value="Fluids" />
+                                <option value="Filters" />
+                                <option value="Electrical" />
+                                <option value="Engine" />
+                                <option value="Suspension" />
+                                <option value="Transmission" />
+                                <option value="Body & Trim" />
+                            </datalist>
+                            <span asp-validation-for="Category" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Manufacturer *</label>
+                            <input asp-for="Manufacturer" class="form-control" placeholder="e.g. Bosch, Mann-Filter, Brembo, Exide" required />
+                            <span asp-validation-for="Manufacturer" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Supplier & Compatible Vehicles -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Supplier</label>
+                            <input asp-for="Supplier" class="form-control" placeholder="e.g. Brembo India Distribution Pvt Ltd" />
+                            <span asp-validation-for="Supplier" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Compatible Vehicles</label>
+                            <input asp-for="CompatibleVehicles" class="form-control" placeholder="e.g. Hyundai Creta, Kia Seltos, All Models" />
+                            <span asp-validation-for="CompatibleVehicles" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Pricing -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Cost Price (₹) *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">₹</span>
+                                <input asp-for="CostPrice" type="number" step="0.01" min="0" class="form-control" required />
+                            </div>
+                            <span asp-validation-for="CostPrice" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Selling Price (₹) *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">₹</span>
+                                <input asp-for="SellingPrice" type="number" step="0.01" min="0" class="form-control" required />
+                            </div>
+                            <span asp-validation-for="SellingPrice" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Reorder Level & Warehouse Location -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Reorder Threshold (Min Alert Level) *</label>
+                            <input asp-for="ReorderLevel" type="number" min="0" class="form-control" required />
+                            <small class="text-muted">Triggers low stock alert when available stock falls to or below this level.</small>
+                            <span asp-validation-for="ReorderLevel" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Warehouse / Bin Location *</label>
+                            <input asp-for="WarehouseLocation" class="form-control" placeholder="e.g. Bay A - Rack 01, Bin C4" required />
+                            <span asp-validation-for="WarehouseLocation" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Service Center & Warranty -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Assigned Service Center</label>
+                            <select asp-for="ServiceCenterId" class="form-select">
+                                <option value="">Central Warehouse / All Hubs</option>
+                                @foreach (var sc in serviceCenters)
+                                {
+                                    <option value="@sc.Id">@sc.Name (@sc.Code)</option>
+                                }
+                            </select>
+                            <span asp-validation-for="ServiceCenterId" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Warranty Period (Days)</label>
+                            <div class="input-group">
+                                <input asp-for="WarrantyPeriodDays" type="number" min="0" class="form-control" />
+                                <span class="input-group-text">days</span>
+                            </div>
+                            <small class="text-muted">Standard parts warranty period for claims validation.</small>
+                            <span asp-validation-for="WarrantyPeriodDays" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                        <a asp-action="Index" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to Inventory
+                        </a>
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-check2-circle"></i> Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        document.getElementById('partIsActiveSwitch')?.addEventListener('change', function() {
+            const label = this.nextElementSibling;
+            if (label) {
+                label.textContent = this.checked ? 'Active' : 'Inactive';
+            }
+        });
+    </script>
+}

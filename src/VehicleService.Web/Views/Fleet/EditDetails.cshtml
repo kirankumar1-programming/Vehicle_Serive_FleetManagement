@@ -1,0 +1,107 @@
+@model UpdateCompanyFleetDto
+@{
+    ViewData["Title"] = $"Update Fleet Details - {Model.CompanyName}";
+}
+
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card p-4 shadow border-0">
+                <div class="d-flex align-items-center justify-content-between mb-4 pb-2 border-bottom">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="stat-icon primary p-3 rounded-circle bg-danger-subtle text-danger">
+                            <i class="bi bi-truck fs-4"></i>
+                        </div>
+                        <div>
+                            <h3 class="fw-bold mb-0">Update Fleet Organization Details</h3>
+                            <p class="text-muted small mb-0">Update operational contact information, address, and primary contact person</p>
+                        </div>
+                    </div>
+                    <span class="badge bg-dark font-monospace fs-6">@Model.RegistrationNumber</span>
+                </div>
+
+                <div asp-validation-summary="All" class="text-danger small mb-3"></div>
+
+                <form asp-action="EditDetails" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="Id" />
+                    <input type="hidden" asp-for="CorporateDiscountRate" />
+                    <input type="hidden" asp-for="MonthlyBudgetLimit" />
+                    <input type="hidden" asp-for="IsActive" />
+
+                    <!-- Readonly Corporate Terms Info -->
+                    <div class="card bg-light border-0 p-3 mb-4">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <span class="text-muted small">Corporate Discount Rate:</span>
+                                <div class="fw-bold text-success fs-5">@Model.CorporateDiscountRate% Off</div>
+                                <small class="text-muted">Managed by platform administration.</small>
+                            </div>
+                            <div class="col-md-6">
+                                <span class="text-muted small">Monthly Spend Limit:</span>
+                                <div class="fw-bold text-primary fs-5">₹@Model.MonthlyBudgetLimit.ToString("N0")</div>
+                                <small class="text-muted">Approved monthly commercial credit cap.</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- Company & Registration Info -->
+                        <div class="col-md-12">
+                            <label class="form-label fw-semibold">Company Name *</label>
+                            <input asp-for="CompanyName" class="form-control" placeholder="e.g. Apex FastLogistics Solutions Pvt Ltd" required />
+                            <span asp-validation-for="CompanyName" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Registration Number / CIN *</label>
+                            <input asp-for="RegistrationNumber" class="form-control font-monospace" placeholder="e.g. CIN-U72200KA2021PTC123456" required />
+                            <span asp-validation-for="RegistrationNumber" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Tax ID / GSTIN *</label>
+                            <input asp-for="TaxId" class="form-control font-monospace" placeholder="e.g. 29AAACA1234A1Z5" required />
+                            <span asp-validation-for="TaxId" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Contact Details -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Primary Contact Person *</label>
+                            <input asp-for="ContactPerson" class="form-control" placeholder="e.g. Rajesh Sharma" required />
+                            <span asp-validation-for="ContactPerson" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Operations Contact Email *</label>
+                            <input asp-for="ContactEmail" type="email" class="form-control" placeholder="e.g. fleet.ops@company.com" required />
+                            <span asp-validation-for="ContactEmail" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Operations Contact Phone *</label>
+                            <input asp-for="ContactPhone" type="tel" class="form-control" placeholder="e.g. +91 98801 23456" required />
+                            <span asp-validation-for="ContactPhone" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Address -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Depot / Headquarters Address *</label>
+                            <textarea asp-for="Address" class="form-control" rows="2" placeholder="e.g. Building 4, Electronic City Phase 1, Bangalore" required></textarea>
+                            <span asp-validation-for="Address" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                        <a asp-action="Index" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+                        </a>
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-check-circle-fill me-1"></i> Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

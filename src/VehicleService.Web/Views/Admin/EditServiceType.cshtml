@@ -1,0 +1,168 @@
+@model UpdateServiceTypeDto
+@{
+    ViewData["Title"] = $"Edit Service - {Model.Name}";
+}
+
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card p-4 shadow border-0">
+                <div class="d-flex align-items-center justify-content-between mb-4 pb-2 border-bottom">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="stat-icon primary p-3 rounded-circle bg-primary-subtle text-primary">
+                            <i class="bi bi-journal-text fs-4"></i>
+                        </div>
+                        <div>
+                            <h3 class="fw-bold mb-0">Edit Service Details</h3>
+                            <p class="text-muted small mb-0">Update pricing, labor rates, duration, required parts, warranty, and tax specifications</p>
+                        </div>
+                    </div>
+                    <span class="badge bg-primary font-monospace fs-6">@Model.Code</span>
+                </div>
+
+                <div asp-validation-summary="All" class="text-danger small mb-3"></div>
+
+                <form asp-action="EditServiceType" asp-route-id="@Model.Id" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="Id" />
+                    <input type="hidden" asp-for="Code" />
+
+                    <!-- Status Banner / Toggle -->
+                    <div class="card bg-light border-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="fw-bold mb-1"><i class="bi bi-power text-primary me-1"></i> Catalog Service Availability</h6>
+                                <p class="text-muted small mb-0">
+                                    Active services can be selected by customers and service advisors during service booking and estimate generation.
+                                </p>
+                            </div>
+                            <div class="form-check form-switch fs-5">
+                                <input asp-for="IsActive" class="form-check-input cursor-pointer" type="checkbox" role="switch" id="serviceIsActiveSwitch" />
+                                <label class="form-check-label fs-6 fw-semibold ms-1" for="serviceIsActiveSwitch">
+                                    @(Model.IsActive ? "Active" : "Inactive")
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- Service Name & Category -->
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold">Service Name *</label>
+                            <input asp-for="Name" class="form-control" placeholder="e.g. Comprehensive Periodic Service" required />
+                            <span asp-validation-for="Name" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Category</label>
+                            <input asp-for="Category" class="form-control" list="categoryOptions" placeholder="e.g. Periodic Maintenance" />
+                            <datalist id="categoryOptions">
+                                <option value="Periodic Maintenance" />
+                                <option value="Fluid & Filter" />
+                                <option value="Brake System" />
+                                <option value="Climate Control" />
+                                <option value="Tyres & Suspension" />
+                                <option value="Diagnostics" />
+                                <option value="Body & Paint" />
+                            </datalist>
+                            <span asp-validation-for="Category" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Description -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Description *</label>
+                            <textarea asp-for="Description" class="form-control" rows="3" placeholder="Provide a detailed scope of work for this service..." required></textarea>
+                            <span asp-validation-for="Description" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Duration & Warranty -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Estimated Duration (Hours) *</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-clock-history"></i></span>
+                                <input asp-for="EstimatedDurationHours" type="number" step="0.25" min="0.1" max="100" class="form-control" required />
+                                <span class="input-group-text">hrs</span>
+                            </div>
+                            <span asp-validation-for="EstimatedDurationHours" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Warranty Period (Days) *</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-shield-check"></i></span>
+                                <input asp-for="WarrantyPeriodDays" type="number" min="0" max="3650" class="form-control" required />
+                                <span class="input-group-text">days</span>
+                            </div>
+                            <span asp-validation-for="WarrantyPeriodDays" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Pricing & Labor -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Base Price (₹) *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">₹</span>
+                                <input asp-for="BasePrice" type="number" step="1" min="0" class="form-control" required />
+                            </div>
+                            <span asp-validation-for="BasePrice" class="text-danger small"></span>
+                            <small class="text-muted">Standard cost for service package.</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Labor Charges (₹) *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">₹</span>
+                                <input asp-for="LaborCharges" type="number" step="1" min="0" class="form-control" required />
+                            </div>
+                            <span asp-validation-for="LaborCharges" class="text-danger small"></span>
+                            <small class="text-muted">Mechanic labor billing component.</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Applicable Taxes (%) *</label>
+                            <div class="input-group">
+                                <input asp-for="ApplicableTaxPercent" type="number" step="0.5" min="0" max="100" class="form-control" required />
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <span asp-validation-for="ApplicableTaxPercent" class="text-danger small"></span>
+                            <small class="text-muted">Standard GST or sales tax rate.</small>
+                        </div>
+
+                        <!-- Required Parts -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Required Parts</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-box-seam"></i></span>
+                                <input asp-for="RecommendedPartsSummary" class="form-control" placeholder="e.g. Synthetic Engine Oil (3.5L), Oil Filter, Air Filter" />
+                            </div>
+                            <span asp-validation-for="RecommendedPartsSummary" class="text-danger small"></span>
+                            <small class="text-muted">List default replacement parts or consumables required for this job.</small>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                        <a asp-action="ServiceCatalog" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to Service Catalog
+                        </a>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary px-4">
+                                <i class="bi bi-check-circle"></i> Save Service Details
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const switchEl = document.getElementById('serviceIsActiveSwitch');
+            if (switchEl) {
+                switchEl.addEventListener('change', function () {
+                    const label = this.nextElementSibling;
+                    if (label) {
+                        label.textContent = this.checked ? 'Active' : 'Inactive';
+                    }
+                });
+            }
+        });
+    </script>
+}

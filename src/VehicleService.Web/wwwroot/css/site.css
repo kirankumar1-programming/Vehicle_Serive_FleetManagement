@@ -111,10 +111,16 @@ h5.fw-bold.text-primary i {
   transition: all 0.15s ease;
 }
 
-.navbar-custom .nav-link:hover,
+.navbar-custom .nav-link:hover {
+  color: var(--primary) !important;
+  background-color: var(--primary-light);
+}
+
 .navbar-custom .nav-link.active {
   color: var(--primary) !important;
   background-color: var(--primary-light);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.2);
 }
 
 /* Nav Pills & Tab Headers */

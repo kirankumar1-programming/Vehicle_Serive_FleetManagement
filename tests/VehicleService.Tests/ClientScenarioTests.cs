@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using VehicleService.Application.DTOs;
@@ -438,6 +438,71 @@ public class ClientScenarioTests : IDisposable
         // Case C: Exceeded mileage limit (e.g., 60,000 KM > 50,000 KM)
         var resultOverMileage = await warrantyService.CheckWarrantyEligibilityAsync(vehicle.Id, "Brake Caliper", 60000);
         resultOverMileage.IsEligible.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task UpdatePartAsync_UpdatesAllEditableFieldsCorrectly()
+    {
+        // Arrange
+        var inventoryService = new InventoryService(_unitOfWork);
+        var part = new InventoryPart
+        {
+            PartNumber = "TEST-PART-01",
+            Name = "Original Part Name",
+            Category = "Brakes",
+            Manufacturer = "Original Manufacturer",
+            Supplier = "Original Supplier",
+            CompatibleVehicles = "All Models",
+            CostPrice = 1000m,
+            SellingPrice = 1500m,
+            AvailableQuantity = 20,
+            ReservedQuantity = 2,
+            ReorderLevel = 5,
+            WarehouseLocation = "Bay A - Rack 01",
+            WarrantyPeriodDays = 180,
+            IsActive = true
+        };
+        _context.InventoryParts.Add(part);
+        await _context.SaveChangesAsync();
+
+        var updateDto = new InventoryPartDto
+        {
+            Id = part.Id,
+            PartNumber = "TEST-PART-UPDATED",
+            Name = "Ceramic Performance Brake Pads",
+            Category = "Brakes & Suspension",
+            Manufacturer = "Brembo",
+            Supplier = "Brembo Global Distribution",
+            CompatibleVehicles = "Hyundai Creta, Kia Seltos",
+            CostPrice = 1200m,
+            SellingPrice = 1850m,
+            ReorderLevel = 8,
+            WarehouseLocation = "Bay B - Shelf 04",
+            WarrantyPeriodDays = 365,
+            IsActive = false
+        };
+
+        // Act
+        await inventoryService.UpdatePartAsync(part.Id, updateDto);
+
+        // Assert
+        var updatedPart = await _context.InventoryParts.FindAsync(part.Id);
+        updatedPart.Should().NotBeNull();
+        updatedPart!.PartNumber.Should().Be("TEST-PART-UPDATED");
+        updatedPart.Name.Should().Be("Ceramic Performance Brake Pads");
+        updatedPart.Category.Should().Be("Brakes & Suspension");
+        updatedPart.Manufacturer.Should().Be("Brembo");
+        updatedPart.Supplier.Should().Be("Brembo Global Distribution");
+        updatedPart.CompatibleVehicles.Should().Be("Hyundai Creta, Kia Seltos");
+        updatedPart.CostPrice.Should().Be(1200m);
+        updatedPart.SellingPrice.Should().Be(1850m);
+        updatedPart.ReorderLevel.Should().Be(8);
+        updatedPart.WarehouseLocation.Should().Be("Bay B - Shelf 04");
+        updatedPart.WarrantyPeriodDays.Should().Be(365);
+        updatedPart.IsActive.Should().BeFalse();
+        // Existing quantities must remain intact
+        updatedPart.AvailableQuantity.Should().Be(20);
+        updatedPart.ReservedQuantity.Should().Be(2);
     }
 
     public void Dispose()

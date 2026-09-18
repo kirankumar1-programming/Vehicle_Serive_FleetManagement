@@ -1,39 +1,119 @@
-﻿@model IReadOnlyList<ApplicationUser>
+@model IReadOnlyList<ApplicationUser>
 @{
     ViewData["Title"] = "User & Role Management";
 }
 
 <div class="container-fluid px-lg-4 my-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
         <div>
             <h2 class="fw-bold mb-1"><i class="bi bi-people-fill text-primary"></i> User & RBAC Role Management</h2>
             <p class="text-muted small mb-0">Manage platform users, roles, permissions, and service center assignments</p>
         </div>
+        <div>
+            <span class="badge bg-primary fs-6 font-monospace px-3 py-2">
+                Total Users: @Model.Count
+            </span>
+        </div>
     </div>
 
     <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <span class="fw-bold fs-6"><i class="bi bi-person-lines-fill text-primary me-2"></i> Registered Accounts (@Model.Count)</span>
+            <span class="small text-muted">Active: <strong class="text-success">@Model.Count(u => u.IsActive)</strong> / @Model.Count</span>
+        </div>
         <div class="table-responsive">
-            <table class="table table-custom mb-0">
-                <thead>
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
                     <tr>
-                        <th>Full Name</th>
-                        <th>Email / Username</th>
-                        <th>Phone</th>
+                        <th>User Details</th>
+                        <th>Contact</th>
                         <th>Role Type</th>
+                        <th>Assignment / Facility</th>
                         <th>Status</th>
                         <th>Registered Date</th>
+                        <th class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var u in Model)
                     {
-                        <tr>
-                            <td><strong>@u.FullName</strong></td>
-                            <td>@u.Email</td>
-                            <td>@u.PhoneNumber</td>
-                            <td><span class="badge bg-dark font-monospace">@u.RoleType</span></td>
-                            <td><span class="badge bg-success">Active</span></td>
-                            <td>@u.CreatedAt.ToString("yyyy-MM-dd")</td>
+                        <tr class="@(!u.IsActive ? "opacity-75 table-light" : "")">
+                            <td>
+                                <div class="fw-bold text-dark">@u.FullName</div>
+                                <div class="text-muted small"><i class="bi bi-envelope me-1"></i>@u.Email</div>
+                            </td>
+                            <td>
+                                @if (!string.IsNullOrEmpty(u.PhoneNumber))
+                                {
+                                    <span class="small text-secondary"><i class="bi bi-telephone me-1"></i>@u.PhoneNumber</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">&mdash;</span>
+                                }
+                            </td>
+                            <td>
+                                <span class="badge @(u.RoleType == UserRoleType.Administrator ? "bg-danger" : (u.RoleType == UserRoleType.Customer ? "bg-info text-dark" : "bg-dark")) font-monospace">
+                                    @u.RoleType
+                                </span>
+                            </td>
+                            <td>
+                                @if (u.ServiceCenter != null)
+                                {
+                                    <div class="small fw-semibold text-primary">
+                                        <i class="bi bi-building me-1"></i>@u.ServiceCenter.Name
+                                    </div>
+                                    <small class="text-muted font-monospace">@u.ServiceCenter.Code</small>
+                                }
+                                else if (u.CompanyFleet != null)
+                                {
+                                    <div class="small fw-semibold text-success">
+                                        <i class="bi bi-truck me-1"></i>@u.CompanyFleet.CompanyName
+                                    </div>
+                                    <small class="text-muted">Corporate Fleet</small>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">&mdash;</span>
+                                }
+                            </td>
+                            <td>
+                                @if (u.IsActive)
+                                {
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                        Active
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+                                        Inactive
+                                    </span>
+                                }
+                            </td>
+                            <td class="small text-muted">@u.CreatedAt.ToString("yyyy-MM-dd")</td>
+                            <td class="text-end">
+                                <div class="d-inline-flex gap-1">
+                                    <a asp-action="EditUser" asp-route-id="@u.Id" class="btn btn-outline-primary btn-sm py-1 px-2" title="Edit User Details">
+                                        <i class="bi bi-pencil-square"></i> Edit
+                                    </a>
+                                    <form asp-action="ToggleUserStatus" asp-route-id="@u.Id" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        @if (u.IsActive)
+                                        {
+                                            <button type="submit" class="btn btn-outline-secondary btn-sm py-1 px-2" title="Deactivate User Account" onclick="return confirm('Deactivate account for @u.FullName?');">
+                                                <i class="bi bi-pause-circle"></i>
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <button type="submit" class="btn btn-outline-success btn-sm py-1 px-2" title="Activate User Account">
+                                                <i class="bi bi-play-circle"></i>
+                                            </button>
+                                        }
+                                    </form>
+                                </div>
+                            </td>
                         </tr>
                     }
                 </tbody>

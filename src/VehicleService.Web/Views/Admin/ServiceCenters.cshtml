@@ -1,13 +1,18 @@
-﻿@model IReadOnlyList<ServiceCenter>
+@model IReadOnlyList<ServiceCenter>
 @{
     ViewData["Title"] = "Service Centers & Bays";
 }
 
 <div class="container-fluid px-lg-4 my-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
         <div>
             <h2 class="fw-bold mb-1"><i class="bi bi-building text-primary"></i> Service Centers & Bays (Multi-Location)</h2>
-            <p class="text-muted small mb-0">Multi-location capacity, operational hours, and real-time service bay occupancy</p>
+            <p class="text-muted small mb-0">Multi-location capacity, operational hours, real-time service bay occupancy, and configuration management</p>
+        </div>
+        <div>
+            <a asp-action="AddServiceCenter" class="btn btn-primary px-3 shadow-sm">
+                <i class="bi bi-plus-circle-fill me-1"></i> Add Service Center
+            </a>
         </div>
     </div>
 
@@ -15,26 +20,181 @@
         @foreach (var c in Model)
         {
             <div class="col-lg-6">
-                <div class="card p-4 border-0 shadow-sm h-100">
+                <div class="card p-4 border-0 shadow-sm h-100 @(!c.IsActive ? "opacity-75 bg-light" : "")">
                     <div class="d-flex justify-content-between align-items-start mb-2">
                         <div>
-                            <span class="badge bg-primary font-monospace">@c.Code</span>
-                            <h4 class="fw-bold mt-2 mb-0">@c.Name</h4>
-                            <p class="text-muted small mb-0">@c.Address, @c.City</p>
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="badge bg-primary font-monospace fs-6">@c.Code</span>
+                                @if (c.IsActive)
+                                {
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                                        <i class="bi bi-check-circle-fill me-1"></i> Active Center
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1">
+                                        <i class="bi bi-pause-circle-fill me-1"></i> Inactive
+                                    </span>
+                                }
+                            </div>
+                            <h4 class="fw-bold mt-1 mb-0">@c.Name</h4>
+                            <p class="text-muted small mb-0"><i class="bi bi-geo-alt"></i> @c.Address, @c.City, @c.State</p>
+                            @if (!string.IsNullOrEmpty(c.Phone) || !string.IsNullOrEmpty(c.Email))
+                            {
+                                <p class="text-secondary small mb-0 mt-1">
+                                    @if (!string.IsNullOrEmpty(c.Phone))
+                                    {
+                                        <span><i class="bi bi-telephone"></i> @c.Phone</span>
+                                    }
+                                    @if (!string.IsNullOrEmpty(c.Email))
+                                    {
+                                        <span class="ms-2"><i class="bi bi-envelope"></i> @c.Email</span>
+                                    }
+                                </p>
+                            }
                         </div>
-                        <span class="badge bg-success">Open (@c.OperatingHours)</span>
+                        <div class="text-end">
+                            <span class="badge @(c.IsActive ? "bg-success" : "bg-secondary") mb-2">
+                                <i class="bi bi-clock"></i> @c.OperatingHours
+                            </span>
+                            <div>
+                                <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">
+                                    Capacity: @c.MaxDailyCapacity/day
+                                </span>
+                            </div>
+                        </div>
                     </div>
 
-                    <h6 class="fw-bold mt-3 mb-2 small text-muted text-uppercase">Service Bays (@c.ServiceBays.Count total):</h6>
+                    <!-- Center Action Toolbar -->
+                    <div class="d-flex flex-wrap gap-2 mt-3 pt-2 border-top border-bottom pb-2 align-items-center justify-content-between">
+                        <div class="d-flex gap-2 align-items-center">
+                            <a asp-action="EditServiceCenter" asp-route-id="@c.Id" class="btn btn-primary btn-sm" title="Edit Service Center Details">
+                                <i class="bi bi-pencil-square me-1"></i> Edit Center
+                            </a>
+                            <a asp-action="AddServiceBay" asp-route-centerId="@c.Id" class="btn btn-outline-success btn-sm" title="Add a new bay to this center">
+                                <i class="bi bi-plus-circle me-1"></i> Add Bay
+                            </a>
+                        </div>
+                        <div>
+                            <form asp-action="ToggleServiceCenterStatus" asp-route-id="@c.Id" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                @if (c.IsActive)
+                                {
+                                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Deactivate Center" onclick="return confirm('Deactivate @c.Name? Inactive centers will be unavailable for bookings.');">
+                                        <i class="bi bi-pause-circle me-1"></i> Deactivate
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button type="submit" class="btn btn-outline-success btn-sm" title="Activate Center">
+                                        <i class="bi bi-play-circle me-1"></i> Activate
+                                    </button>
+                                }
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-3 mb-2">
+                        <h6 class="fw-bold mb-0 small text-muted text-uppercase">
+                            Service Bays (@c.ServiceBays.Count total):
+                        </h6>
+                        <span class="small text-muted">
+                            Available: <strong class="text-success">@c.ServiceBays.Count(b => b.Status == BayStatus.Available && b.IsActive)</strong> / @c.ServiceBays.Count
+                        </span>
+                    </div>
+
                     <div class="row g-2">
+                        @if (!c.ServiceBays.Any())
+                        {
+                            <div class="col-12">
+                                <div class="p-3 text-center text-muted border rounded bg-light small">
+                                    No service bays configured yet. Click <strong>"Add Bay"</strong> above to configure bays.
+                                </div>
+                            </div>
+                        }
                         @foreach (var b in c.ServiceBays)
                         {
-                            <div class="col-6">
-                                <div class="p-2 border rounded bg-light small d-flex justify-content-between align-items-center">
-                                    <span><strong>@b.BayName</strong></span>
-                                    <span class="badge @(b.Status == BayStatus.Available ? "bg-success" : (b.Status == BayStatus.Occupied ? "bg-warning text-dark" : "bg-danger"))">
-                                        @b.Status
-                                    </span>
+                            <div class="col-12 col-md-6">
+                                <div class="p-2 border rounded bg-light small h-100 d-flex flex-column justify-content-between @(!b.IsActive ? "opacity-50" : "")">
+                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                        <div>
+                                            <div class="fw-bold">
+                                                @b.BayName
+                                                @if (!b.IsActive)
+                                                {
+                                                    <span class="badge bg-secondary-subtle text-secondary border ms-1" style="font-size: 0.65rem;">Inactive</span>
+                                                }
+                                            </div>
+                                            <div class="text-muted small">
+                                                <span class="font-monospace fw-semibold text-primary">@b.BayNumber</span>
+                                                @if (!string.IsNullOrEmpty(b.BayType))
+                                                {
+                                                    <span> &bull; @b.BayType</span>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="d-flex justify-content-between align-items-center mt-2 pt-1 border-top">
+                                        <!-- Quick Status Dropdown -->
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm @(b.Status == BayStatus.Available ? "btn-success" : (b.Status == BayStatus.Occupied ? "btn-warning text-dark" : "btn-danger")) dropdown-toggle py-0 px-2 small" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Click to quickly change bay occupancy status">
+                                                @b.Status
+                                            </button>
+                                            <ul class="dropdown-menu shadow-sm" style="font-size: 0.85rem;">
+                                                <li>
+                                                    <form asp-action="UpdateBayStatus" asp-route-id="@b.Id" method="post" class="d-inline">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="status" value="Available" />
+                                                        <button type="submit" class="dropdown-item py-1 text-success @(b.Status == BayStatus.Available ? "active text-white" : "")">
+                                                            <i class="bi bi-check-circle me-1"></i> Available
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                                <li>
+                                                    <form asp-action="UpdateBayStatus" asp-route-id="@b.Id" method="post" class="d-inline">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="status" value="Occupied" />
+                                                        <button type="submit" class="dropdown-item py-1 text-warning text-dark @(b.Status == BayStatus.Occupied ? "active text-white" : "")">
+                                                            <i class="bi bi-cone-striped me-1"></i> Occupied
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                                <li>
+                                                    <form asp-action="UpdateBayStatus" asp-route-id="@b.Id" method="post" class="d-inline">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="status" value="Maintenance" />
+                                                        <button type="submit" class="dropdown-item py-1 text-danger @(b.Status == BayStatus.Maintenance ? "active text-white" : "")">
+                                                            <i class="bi bi-tools me-1"></i> Maintenance
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                            </ul>
+                                        </div>
+
+                                        <!-- Edit and Toggle Action Buttons -->
+                                        <div class="d-flex gap-1">
+                                            <a asp-action="EditServiceBay" asp-route-id="@b.Id" class="btn btn-outline-primary btn-sm py-0 px-2" title="Edit Bay Configuration">
+                                                <i class="bi bi-pencil-square"></i> Edit
+                                            </a>
+                                            <form asp-action="ToggleBayStatus" asp-route-id="@b.Id" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                @if (b.IsActive)
+                                                {
+                                                    <button type="submit" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Deactivate Bay">
+                                                        <i class="bi bi-pause-circle"></i>
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <button type="submit" class="btn btn-outline-success btn-sm py-0 px-2" title="Activate Bay">
+                                                        <i class="bi bi-play-circle"></i>
+                                                    </button>
+                                                }
+                                            </form>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         }

@@ -1,0 +1,125 @@
+@model CreateCompanyFleetDto
+@{
+    ViewData["Title"] = "Add Corporate Fleet";
+}
+
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card p-4 shadow border-0">
+                <div class="d-flex align-items-center justify-content-between mb-4 pb-2 border-bottom">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="stat-icon primary p-3 rounded-circle bg-primary-subtle text-primary">
+                            <i class="bi bi-truck fs-4"></i>
+                        </div>
+                        <div>
+                            <h3 class="fw-bold mb-0">Register Corporate Fleet</h3>
+                            <p class="text-muted small mb-0">Onboard a new enterprise fleet client, configure discount policy, and budget limits</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div asp-validation-summary="All" class="text-danger small mb-3"></div>
+
+                <form asp-action="AddFleet" method="post">
+                    @Html.AntiForgeryToken()
+
+                    <!-- Initial Operational Status Toggle -->
+                    <div class="card bg-light border-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="fw-bold mb-1"><i class="bi bi-power text-primary me-1"></i> Initial Operational Status</h6>
+                                <p class="text-muted small mb-0">
+                                    Set whether this corporate fleet is immediately active and eligible for vehicle registrations and corporate discounts.
+                                </p>
+                            </div>
+                            <div class="form-check form-switch fs-5">
+                                <input asp-for="IsActive" class="form-check-input cursor-pointer" type="checkbox" role="switch" id="addFleetIsActiveSwitch" checked />
+                                <label class="form-check-label fs-6 fw-semibold ms-1" for="addFleetIsActiveSwitch">
+                                    Active
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- Company & Tax Details -->
+                        <div class="col-md-12">
+                            <label class="form-label fw-semibold">Company / Enterprise Name *</label>
+                            <input asp-for="CompanyName" class="form-control" placeholder="e.g. Apex FastLogistics Solutions Pvt Ltd" required />
+                            <span asp-validation-for="CompanyName" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Registration Number / CIN *</label>
+                            <input asp-for="RegistrationNumber" class="form-control font-monospace" placeholder="e.g. CIN-U72200KA2021PTC123456" required />
+                            <span asp-validation-for="RegistrationNumber" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Tax ID / GSTIN *</label>
+                            <input asp-for="TaxId" class="form-control font-monospace" placeholder="e.g. 29AAACA1234A1Z5" required />
+                            <span asp-validation-for="TaxId" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Commercial Terms -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Corporate Discount Rate (%) *</label>
+                            <div class="input-group">
+                                <input asp-for="CorporateDiscountRate" class="form-control" type="number" step="0.5" min="0" max="100" required />
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <span asp-validation-for="CorporateDiscountRate" class="text-danger small"></span>
+                            <small class="text-muted">Applied automatically to service invoices for vehicles in this fleet.</small>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Monthly Maintenance Budget (₹) *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">₹</span>
+                                <input asp-for="MonthlyBudgetLimit" class="form-control" type="number" step="1000" min="0" required />
+                            </div>
+                            <span asp-validation-for="MonthlyBudgetLimit" class="text-danger small"></span>
+                            <small class="text-muted">Credit spend threshold limit per calendar month.</small>
+                        </div>
+
+                        <!-- Contact Details -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Primary Contact Person *</label>
+                            <input asp-for="ContactPerson" class="form-control" placeholder="e.g. Rajesh Sharma" required />
+                            <span asp-validation-for="ContactPerson" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Contact Email *</label>
+                            <input asp-for="ContactEmail" type="email" class="form-control" placeholder="e.g. fleet.ops@company.com" required />
+                            <span asp-validation-for="ContactEmail" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Contact Phone *</label>
+                            <input asp-for="ContactPhone" type="tel" class="form-control" placeholder="e.g. +91 98801 23456" required />
+                            <span asp-validation-for="ContactPhone" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Office Address -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Headquarters / Fleet Depot Address *</label>
+                            <textarea asp-for="Address" class="form-control" rows="2" placeholder="e.g. Building 4, Electronic City Phase 1, Bangalore, Karnataka" required></textarea>
+                            <span asp-validation-for="Address" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                        <a asp-action="Fleets" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left me-1"></i> Cancel & Return
+                        </a>
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-check-circle-fill me-1"></i> Register Fleet
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

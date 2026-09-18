@@ -1,4 +1,4 @@
-﻿@model IReadOnlyList<VehicleDto>
+@model IReadOnlyList<VehicleDto>
 @{
     ViewData["Title"] = "Fleet Vehicles & Drivers";
     var drivers = ViewBag.Drivers as IList<ApplicationUser> ?? new List<ApplicationUser>();
@@ -9,6 +9,11 @@
         <div>
             <h2 class="fw-bold mb-1"><i class="bi bi-truck text-danger"></i> Fleet Vehicles & Driver Assignments</h2>
             <p class="text-muted small mb-0">Assign commercial drivers to vehicles and track odometer readings</p>
+        </div>
+        <div>
+            <a asp-action="AddVehicle" asp-route-fleetId="@ViewBag.TargetFleetId" class="btn btn-primary">
+                <i class="bi bi-plus-circle me-1"></i> Add Fleet Vehicle
+            </a>
         </div>
     </div>
 
@@ -22,12 +27,28 @@
                         <th>Make & Model</th>
                         <th>Odometer (KM)</th>
                         <th>Assigned Driver</th>
+                        <th>Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var v in Model)
+                    @if (Model.Count == 0)
                     {
+                        <tr>
+                            <td colspan="7" class="text-center py-5">
+                                <div class="text-muted mb-3"><i class="bi bi-truck fs-1 text-secondary"></i></div>
+                                <h5 class="fw-bold text-dark">No commercial vehicles registered in this fleet</h5>
+                                <p class="text-muted small mb-3">Add your first commercial vehicle to track odometer, assign drivers, and manage services.</p>
+                                <a asp-action="AddVehicle" asp-route-fleetId="@ViewBag.TargetFleetId" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-plus-circle me-1"></i> Add Fleet Vehicle
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var v in Model)
+                        {
                         <tr>
                             <td class="fw-bold font-monospace text-primary">@v.RegistrationNumber</td>
                             <td class="font-monospace small">@v.VIN</td>
@@ -39,9 +60,28 @@
                                 </span>
                             </td>
                             <td>
-                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#driverModal_@v.Id">
-                                    <i class="bi bi-person-plus"></i> Assign Driver
-                                </button>
+                                @if (v.IsActive)
+                                {
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                        <i class="bi bi-check-circle me-1"></i> Active
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+                                        <i class="bi bi-slash-circle me-1"></i> Inactive
+                                    </span>
+                                }
+                            </td>
+                            <td>
+                                <div class="d-flex gap-1">
+                                    <a asp-action="EditVehicle" asp-route-id="@v.Id" class="btn btn-sm btn-outline-secondary" title="Edit Vehicle Details">
+                                        <i class="bi bi-pencil-square"></i> Edit Details
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#driverModal_@v.Id">
+                                        <i class="bi bi-person-plus"></i> Assign Driver
+                                    </button>
+                                </div>
 
                                 <!-- Driver Modal -->
                                 <div class="modal fade" id="driverModal_@v.Id" tabindex="-1">
@@ -80,6 +120,7 @@
                             </td>
                         </tr>
                     }
+                }
                 </tbody>
             </table>
         </div>

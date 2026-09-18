@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using VehicleService.Application.DTOs;
 using VehicleService.Application.Interfaces;
 using VehicleService.Domain.Entities;
@@ -122,16 +122,33 @@ public class InventoryService : IInventoryService
         var part = await _unitOfWork.Repository<InventoryPart>().GetByIdAsync(id);
         if (part == null) throw new DomainException("Part not found.");
 
-        part.Name = dto.Name;
-        part.Category = dto.Category;
-        part.Manufacturer = dto.Manufacturer;
-        part.Supplier = dto.Supplier;
-        part.CompatibleVehicles = dto.CompatibleVehicles;
+        if (!string.IsNullOrWhiteSpace(dto.PartNumber))
+        {
+            var cleanPartNo = dto.PartNumber.Trim().ToUpper();
+            if (!string.Equals(part.PartNumber, cleanPartNo, StringComparison.OrdinalIgnoreCase))
+            {
+                var existing = await _unitOfWork.Repository<InventoryPart>()
+                    .FirstOrDefaultAsync(p => p.PartNumber.ToUpper() == cleanPartNo && p.Id != id);
+                if (existing != null)
+                {
+                    throw new DomainException($"Part number '{cleanPartNo}' already exists.");
+                }
+                part.PartNumber = cleanPartNo;
+            }
+        }
+
+        part.Name = dto.Name?.Trim() ?? string.Empty;
+        part.Category = dto.Category?.Trim() ?? string.Empty;
+        part.Manufacturer = dto.Manufacturer?.Trim() ?? string.Empty;
+        part.Supplier = dto.Supplier?.Trim() ?? string.Empty;
+        part.CompatibleVehicles = dto.CompatibleVehicles?.Trim() ?? string.Empty;
         part.CostPrice = dto.CostPrice;
         part.SellingPrice = dto.SellingPrice;
         part.ReorderLevel = dto.ReorderLevel;
-        part.WarehouseLocation = dto.WarehouseLocation;
+        part.WarehouseLocation = dto.WarehouseLocation?.Trim() ?? string.Empty;
         part.WarrantyPeriodDays = dto.WarrantyPeriodDays;
+        part.ServiceCenterId = dto.ServiceCenterId;
+        part.IsActive = dto.IsActive;
 
         await _unitOfWork.Repository<InventoryPart>().UpdateAsync(part);
         await _unitOfWork.SaveChangesAsync();

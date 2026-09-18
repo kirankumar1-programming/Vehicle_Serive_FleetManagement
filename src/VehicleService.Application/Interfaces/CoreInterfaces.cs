@@ -109,6 +109,7 @@ public interface IFleetService
     Task<IReadOnlyList<CompanyFleet>> GetAllFleetsAsync();
     Task<CompanyFleet?> GetFleetByIdAsync(int fleetId);
     Task<CompanyFleet> RegisterFleetAsync(CompanyFleet fleet);
+    Task<CompanyFleet> UpdateFleetAsync(CompanyFleet fleet);
 }
 
 public interface IRoadsideService

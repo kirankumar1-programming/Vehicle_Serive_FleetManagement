@@ -1,49 +1,224 @@
-﻿@model IReadOnlyList<ServiceType>
+@model IReadOnlyList<ServiceType>
 @{
     ViewData["Title"] = "Service Catalog & Packages";
     var packages = ViewBag.Packages as IReadOnlyList<ServicePackage> ?? new List<ServicePackage>();
 }
 
 <div class="container-fluid px-lg-4 my-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
         <div>
             <h2 class="fw-bold mb-1"><i class="bi bi-journal-text text-primary"></i> Service Catalog & Bundled Packages</h2>
-            <p class="text-muted small mb-0">Configure periodic maintenance services, standard labor rates, taxes & package discounts</p>
+            <p class="text-muted small mb-0">Configure periodic maintenance services, standard labor rates, required parts, taxes & package discounts</p>
         </div>
     </div>
 
     <div class="row g-4 mb-4">
         <div class="col-lg-12">
             <div class="card border-0 shadow-sm">
-                <div class="card-header fw-bold">Individual Service Types</div>
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <span class="fw-bold fs-6"><i class="bi bi-list-check text-primary me-2"></i> Individual Service Catalog Items (@Model.Count total)</span>
+                </div>
                 <div class="table-responsive">
-                    <table class="table table-custom mb-0">
-                        <thead>
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
                             <tr>
                                 <th>Code</th>
-                                <th>Service Name</th>
+                                <th>Service Name & Description</th>
                                 <th>Category</th>
                                 <th>Duration</th>
                                 <th>Base Price</th>
                                 <th>Labor Charge</th>
-                                <th>Tax</th>
+                                <th>Taxes</th>
+                                <th>Warranty</th>
+                                <th>Required Parts</th>
+                                <th>Status</th>
+                                <th class="text-end">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var s in Model)
                             {
-                                <tr>
+                                <tr class="@(!s.IsActive ? "opacity-75 table-light" : "")">
                                     <td class="fw-bold font-monospace text-primary">@s.Code</td>
-                                    <td><strong>@s.Name</strong></td>
-                                    <td><span class="badge bg-secondary">@s.Category</span></td>
-                                    <td>~@s.EstimatedDurationHours hrs</td>
-                                    <td class="fw-bold">₹@s.BasePrice.ToString("N0")</td>
-                                    <td>₹@s.LaborCharges.ToString("N0")</td>
-                                    <td>@s.ApplicableTaxPercent%</td>
+                                    <td>
+                                        <div class="fw-bold text-dark">@s.Name</div>
+                                        <small class="text-muted d-block text-truncate" style="max-width: 260px;" title="@s.Description">
+                                            @s.Description
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary-subtle text-secondary border">@s.Category</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border">~@s.EstimatedDurationHours hrs</span>
+                                    </td>
+                                    <td class="fw-bold text-dark">₹@s.BasePrice.ToString("N0")</td>
+                                    <td class="text-secondary">₹@s.LaborCharges.ToString("N0")</td>
+                                    <td><span class="badge bg-info-subtle text-info border">@s.ApplicableTaxPercent%</span></td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border">
+                                            <i class="bi bi-shield-check text-success"></i> @s.WarrantyPeriodDays days
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(s.RecommendedPartsSummary))
+                                        {
+                                            <small class="text-muted d-inline-block text-truncate" style="max-width: 200px;" title="@s.RecommendedPartsSummary">
+                                                <i class="bi bi-box-seam me-1 text-primary"></i>@s.RecommendedPartsSummary
+                                            </small>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">&mdash;</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (s.IsActive)
+                                        {
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                                Active
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+                                                Inactive
+                                            </span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="d-inline-flex gap-1">
+                                            <a asp-action="EditServiceType" asp-route-id="@s.Id" class="btn btn-outline-primary btn-sm py-1 px-2" title="Edit Service Details">
+                                                <i class="bi bi-pencil-square"></i> Edit
+                                            </a>
+                                            <form asp-action="ToggleServiceTypeStatus" asp-route-id="@s.Id" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                @if (s.IsActive)
+                                                {
+                                                    <button type="submit" class="btn btn-outline-secondary btn-sm py-1 px-2" title="Deactivate Service">
+                                                        <i class="bi bi-pause-circle"></i>
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <button type="submit" class="btn btn-outline-success btn-sm py-1 px-2" title="Activate Service">
+                                                        <i class="bi bi-play-circle"></i>
+                                                    </button>
+                                                }
+                                            </form>
+                                        </div>
+                                    </td>
                                 </tr>
                             }
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-12 mt-2">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div>
+                        <span class="fw-bold fs-6"><i class="bi bi-box2-heart text-primary me-2"></i> Bundled Service Packages (@packages.Count total)</span>
+                        <div class="small text-muted">Curated combo packages offering customer savings over individual service line items</div>
+                    </div>
+                    <div>
+                        <a asp-action="AddServicePackage" class="btn btn-primary btn-sm px-3 shadow-sm">
+                            <i class="bi bi-plus-circle-fill me-1"></i> Add Service Package
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    @if (!packages.Any())
+                    {
+                        <div class="text-center py-4">
+                            <i class="bi bi-box2 text-muted fs-2"></i>
+                            <h6 class="mt-2 text-muted">No Bundled Service Packages Created</h6>
+                            <p class="small text-muted">Create custom bundles to offer combined discounts for periodic maintenance.</p>
+                            <a asp-action="AddServicePackage" class="btn btn-primary btn-sm">
+                                <i class="bi bi-plus-circle-fill me-1"></i> Create First Package
+                            </a>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="row g-3">
+                            @foreach (var p in packages)
+                            {
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="card h-100 border p-3 @(!p.IsActive ? "opacity-75 bg-light" : "")">
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <div>
+                                                <h5 class="fw-bold mb-0 text-dark">@p.Name</h5>
+                                                <small class="text-muted"><i class="bi bi-calendar-check me-1"></i>@p.ValidityDays Days Validity</small>
+                                            </div>
+                                            <div class="d-flex flex-column align-items-end gap-1">
+                                                <span class="badge bg-success">@p.SavingsPercent% OFF</span>
+                                                @if (p.IsActive)
+                                                {
+                                                    <span class="badge bg-success-subtle text-success border border-success-subtle small">Active</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle small">Inactive</span>
+                                                }
+                                            </div>
+                                        </div>
+
+                                        <p class="text-muted small mb-3">@p.Description</p>
+
+                                        @if (p.PackageItems != null && p.PackageItems.Any())
+                                        {
+                                            <div class="mb-3 p-2 bg-light rounded small border">
+                                                <div class="fw-semibold text-secondary mb-1">
+                                                    <i class="bi bi-layers text-primary me-1"></i> Includes @p.PackageItems.Count Services:
+                                                </div>
+                                                <ul class="list-unstyled mb-0 ps-1">
+                                                    @foreach (var item in p.PackageItems)
+                                                    {
+                                                        if (item.ServiceType != null)
+                                                        {
+                                                            <li class="text-truncate text-muted" title="@item.ServiceType.Name">
+                                                                <i class="bi bi-check2 text-success me-1"></i> @item.ServiceType.Name
+                                                            </li>
+                                                        }
+                                                    }
+                                                </ul>
+                                            </div>
+                                        }
+
+                                        <div class="d-flex justify-content-between align-items-center mt-auto pt-2 border-top">
+                                            <div>
+                                                <span class="text-muted text-decoration-line-through small">₹@p.OriginalTotalPrice.ToString("N0")</span>
+                                                <span class="fs-5 fw-bold text-primary ms-1">₹@p.PackagePrice.ToString("N0")</span>
+                                            </div>
+                                            <div class="d-inline-flex gap-1">
+                                                <a asp-action="EditServicePackage" asp-route-id="@p.Id" class="btn btn-outline-primary btn-sm py-1 px-2" title="Edit Package Details">
+                                                    <i class="bi bi-pencil-square"></i> Edit
+                                                </a>
+                                                <form asp-action="ToggleServicePackageStatus" asp-route-id="@p.Id" method="post" class="d-inline">
+                                                    @Html.AntiForgeryToken()
+                                                    @if (p.IsActive)
+                                                    {
+                                                        <button type="submit" class="btn btn-outline-secondary btn-sm py-1 px-2" title="Deactivate Package">
+                                                            <i class="bi bi-pause-circle"></i>
+                                                        </button>
+                                                    }
+                                                    else
+                                                    {
+                                                        <button type="submit" class="btn btn-outline-success btn-sm py-1 px-2" title="Activate Package">
+                                                            <i class="bi bi-play-circle"></i>
+                                                        </button>
+                                                    }
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
                 </div>
             </div>
         </div>

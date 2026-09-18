@@ -5,6 +5,22 @@
     var isAuthenticated = User.Identity?.IsAuthenticated == true;
     var userRole = User.FindFirstValue(ClaimTypes.Role) ?? "Guest";
     var userName = User.FindFirstValue(ClaimTypes.Name) ?? User.Identity?.Name ?? "User";
+
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
+
+    string IsActive(string controller, string? action = null, string[]? extraActions = null)
+    {
+        if (!string.Equals(currentController, controller, StringComparison.OrdinalIgnoreCase))
+            return "";
+        if (string.IsNullOrEmpty(action))
+            return "active";
+        if (string.Equals(currentAction, action, StringComparison.OrdinalIgnoreCase))
+            return "active";
+        if (extraActions != null && extraActions.Any(a => string.Equals(currentAction, a, StringComparison.OrdinalIgnoreCase)))
+            return "active";
+        return "";
+    }
 }
 
 <!DOCTYPE html>
@@ -99,53 +115,55 @@
                     {
                         if (userRole == "Customer")
                         {
-                            <li class="nav-item"><a class="nav-link" asp-controller="Customer" asp-action="Index"><i class="bi bi-speedometer2"></i> My Garage</a></li>
-                            <li class="nav-item"><a class="nav-link" asp-controller="Customer" asp-action="BookService"><i class="bi bi-calendar-plus"></i> Book Service</a></li>
-                            <li class="nav-item"><a class="nav-link" asp-controller="Customer" asp-action="Appointments"><i class="bi bi-clock-history"></i> Appointments</a></li>
-                            <li class="nav-item"><a class="nav-link" asp-controller="Customer" asp-action="Invoices"><i class="bi bi-receipt"></i> Invoices</a></li>
-                            <li class="nav-item"><a class="nav-link" asp-controller="Customer" asp-action="Warranties"><i class="bi bi-shield-check"></i> Warranties</a></li>
-                            <li class="nav-item"><a class="nav-link text-danger" asp-controller="Customer" asp-action="Roadside"><i class="bi bi-geo-alt-fill"></i> Roadside Help</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Customer", "Index", new[] { "VehicleDetails", "AddVehicle", "EditVehicle" })" asp-controller="Customer" asp-action="Index"><i class="bi bi-speedometer2"></i> My Garage</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Customer", "BookService")" asp-controller="Customer" asp-action="BookService"><i class="bi bi-calendar-plus"></i> Book Service</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Customer", "Appointments")" asp-controller="Customer" asp-action="Appointments"><i class="bi bi-clock-history"></i> Appointments</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Customer", "Invoices", new[] { "InvoiceDetails" })" asp-controller="Customer" asp-action="Invoices"><i class="bi bi-receipt"></i> Invoices</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Customer", "Warranties")" asp-controller="Customer" asp-action="Warranties"><i class="bi bi-shield-check"></i> Warranties</a></li>
+                            <li class="nav-item"><a class="nav-link text-danger @IsActive("Customer", "Roadside")" asp-controller="Customer" asp-action="Roadside"><i class="bi bi-geo-alt-fill"></i> Roadside Help</a></li>
                         }
                         else if (userRole == "ServiceAdvisor")
                         {
-                            <li class="nav-item"><a class="nav-link" asp-controller="ServiceAdvisor" asp-action="Index"><i class="bi bi-speedometer2"></i> Advisor Desk</a></li>
-                            <li class="nav-item"><a class="nav-link" asp-controller="ServiceAdvisor" asp-action="Appointments"><i class="bi bi-calendar-check"></i> Daily Bookings</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("ServiceAdvisor", "Index", new[] { "JobCardDetails", "CreateEstimate", "InspectVehicle" })" asp-controller="ServiceAdvisor" asp-action="Index"><i class="bi bi-speedometer2"></i> Advisor Desk</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("ServiceAdvisor", "Appointments")" asp-controller="ServiceAdvisor" asp-action="Appointments"><i class="bi bi-calendar-check"></i> Daily Bookings</a></li>
                         }
                         else if (userRole == "Mechanic")
                         {
-                            <li class="nav-item"><a class="nav-link" asp-controller="Mechanic" asp-action="Index"><i class="bi bi-wrench"></i> My Assigned Jobs</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Mechanic", "Index", new[] { "JobDetails" })" asp-controller="Mechanic" asp-action="Index"><i class="bi bi-wrench"></i> My Assigned Jobs</a></li>
                         }
                         else if (userRole == "InventoryManager")
                         {
-                            <li class="nav-item"><a class="nav-link" asp-controller="Inventory" asp-action="Index"><i class="bi bi-boxes"></i> Spare Parts Catalog</a></li>
-                            <li class="nav-item"><a class="nav-link" asp-controller="Inventory" asp-action="LowStock"><i class="bi bi-exclamation-triangle"></i> Low Stock Alerts</a></li>
-                            <li class="nav-item"><a class="nav-link" asp-controller="Inventory" asp-action="Transactions"><i class="bi bi-arrow-left-right"></i> Stock Movements</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Inventory", "Index", new[] { "AddPart", "EditPart" })" asp-controller="Inventory" asp-action="Index"><i class="bi bi-boxes"></i> Spare Parts Catalog</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Inventory", "LowStock")" asp-controller="Inventory" asp-action="LowStock"><i class="bi bi-exclamation-triangle"></i> Low Stock Alerts</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Inventory", "Transactions")" asp-controller="Inventory" asp-action="Transactions"><i class="bi bi-arrow-left-right"></i> Stock Movements</a></li>
                         }
                         else if (userRole == "FinanceManager")
                         {
-                            <li class="nav-item"><a class="nav-link" asp-controller="Finance" asp-action="Index"><i class="bi bi-receipt-cutoff"></i> Invoices & Billing</a></li>
-                            <li class="nav-item"><a class="nav-link" asp-controller="Finance" asp-action="RevenueReports"><i class="bi bi-graph-up-arrow"></i> Revenue Analytics</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Finance", "Index", new[] { "InvoiceDetails" })" asp-controller="Finance" asp-action="Index"><i class="bi bi-receipt-cutoff"></i> Invoices & Billing</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Finance", "RevenueReports")" asp-controller="Finance" asp-action="RevenueReports"><i class="bi bi-graph-up-arrow"></i> Revenue Analytics</a></li>
                         }
                         else if (userRole == "FleetManager")
                         {
-                            <li class="nav-item"><a class="nav-link" asp-controller="Fleet" asp-action="Index"><i class="bi bi-speedometer2"></i> Fleet Dashboard</a></li>
-                            <li class="nav-item"><a class="nav-link" asp-controller="Fleet" asp-action="Vehicles"><i class="bi bi-truck"></i> Fleet Vehicles</a></li>
-                            <li class="nav-item"><a class="nav-link" asp-controller="Fleet" asp-action="PreventiveMaintenance"><i class="bi bi-tools"></i> Maintenance Due</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Fleet", "Index", new[] { "EditDetails" })" asp-controller="Fleet" asp-action="Index"><i class="bi bi-speedometer2"></i> Fleet Dashboard</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Fleet", "Vehicles", new[] { "EditVehicle", "AddVehicle" })" asp-controller="Fleet" asp-action="Vehicles"><i class="bi bi-truck"></i> Fleet Vehicles</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Fleet", "PreventiveMaintenance")" asp-controller="Fleet" asp-action="PreventiveMaintenance"><i class="bi bi-tools"></i> Maintenance Due</a></li>
                         }
                         else if (userRole == "Administrator")
                         {
-                            <li class="nav-item"><a class="nav-link" asp-controller="Admin" asp-action="Index"><i class="bi bi-cpu"></i> System Overview</a></li>
-                            <li class="nav-item"><a class="nav-link" asp-controller="Admin" asp-action="Users"><i class="bi bi-people"></i> Users & Roles</a></li>
-                            <li class="nav-item"><a class="nav-link" asp-controller="Admin" asp-action="ServiceCenters"><i class="bi bi-building"></i> Centers & Bays</a></li>
-                            <li class="nav-item"><a class="nav-link" asp-controller="Admin" asp-action="ServiceCatalog"><i class="bi bi-journal-text"></i> Service Catalog</a></li>
-                            <li class="nav-item"><a class="nav-link" asp-controller="Admin" asp-action="Coupons"><i class="bi bi-tag"></i> Coupons</a></li>
-                            <li class="nav-item"><a class="nav-link" asp-controller="Admin" asp-action="AuditLogs"><i class="bi bi-fingerprint"></i> Audit Trail</a></li>
-                            <li class="nav-item"><a class="nav-link" asp-controller="Admin" asp-action="Reviews"><i class="bi bi-star"></i> Reviews</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Admin", "Index")" asp-controller="Admin" asp-action="Index"><i class="bi bi-cpu"></i> System Overview</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Admin", "Users", new[] { "EditUser" })" asp-controller="Admin" asp-action="Users"><i class="bi bi-people"></i> Users & Roles</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Admin", "Fleets", new[] { "AddFleet", "EditFleet" })" asp-controller="Admin" asp-action="Fleets"><i class="bi bi-truck"></i> Corporate Fleets</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Admin", "ServiceCenters", new[] { "AddServiceCenter", "EditServiceCenter", "AddServiceBay", "EditServiceBay" })" asp-controller="Admin" asp-action="ServiceCenters"><i class="bi bi-building"></i> Centers & Bays</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Admin", "ServiceCatalog", new[] { "EditServiceType", "AddServicePackage", "EditServicePackage" })" asp-controller="Admin" asp-action="ServiceCatalog"><i class="bi bi-journal-text"></i> Service Catalog</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Inventory", "Index", new[] { "AddPart", "EditPart", "LowStock", "Transactions" })" asp-controller="Inventory" asp-action="Index"><i class="bi bi-boxes"></i> Spare Parts</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Admin", "Coupons", new[] { "AddCoupon", "EditCoupon" })" asp-controller="Admin" asp-action="Coupons"><i class="bi bi-tag"></i> Coupons</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Admin", "AuditLogs")" asp-controller="Admin" asp-action="AuditLogs"><i class="bi bi-fingerprint"></i> Audit Trail</a></li>
+                            <li class="nav-item"><a class="nav-link @IsActive("Admin", "Reviews")" asp-controller="Admin" asp-action="Reviews"><i class="bi bi-star"></i> Reviews</a></li>
                         }
                     }
                     else
                     {
-                        <li class="nav-item"><a class="nav-link" asp-controller="Home" asp-action="Index">Home</a></li>
+                        <li class="nav-item"><a class="nav-link @IsActive("Home", "Index")" asp-controller="Home" asp-action="Index">Home</a></li>
                     }
                 </ul>
 

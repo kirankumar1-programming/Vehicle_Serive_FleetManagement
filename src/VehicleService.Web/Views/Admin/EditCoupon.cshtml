@@ -1,0 +1,163 @@
+@model UpdateCouponDto
+@{
+    ViewData["Title"] = $"Edit Coupon - {Model.Code}";
+}
+
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card p-4 shadow border-0">
+                <div class="d-flex align-items-center justify-content-between mb-4 pb-2 border-bottom">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="stat-icon primary p-3 rounded-circle bg-primary-subtle text-primary">
+                            <i class="bi bi-tag-fill fs-4"></i>
+                        </div>
+                        <div>
+                            <h3 class="fw-bold mb-0">Edit Coupon Details</h3>
+                            <p class="text-muted small mb-0">Update promotional rules, discount value, bill restrictions, and campaign validity</p>
+                        </div>
+                    </div>
+                    <span class="badge bg-primary font-monospace fs-6 px-3 py-2">@Model.Code</span>
+                </div>
+
+                <div asp-validation-summary="All" class="text-danger small mb-3"></div>
+
+                <form asp-action="EditCoupon" asp-route-id="@Model.Id" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="Id" />
+                    <input type="hidden" asp-for="TimesUsed" />
+
+                    <!-- Status Banner / Toggle -->
+                    <div class="card bg-light border-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="fw-bold mb-1"><i class="bi bi-power text-primary me-1"></i> Coupon Availability Status</h6>
+                                <p class="text-muted small mb-0">
+                                    Active coupons can be redeemed by customers during checkout. Deactivate to temporarily pause redemptions.
+                                </p>
+                            </div>
+                            <div class="form-check form-switch fs-5">
+                                <input asp-for="IsActive" class="form-check-input cursor-pointer" type="checkbox" role="switch" id="editCouponIsActiveSwitch" />
+                                <label class="form-check-label fs-6 fw-semibold ms-1" for="editCouponIsActiveSwitch">
+                                    @(Model.IsActive ? "Active" : "Inactive")
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Usage Statistics Summary -->
+                    <div class="alert alert-info border-0 d-flex justify-content-between align-items-center mb-4 py-2 px-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-info-circle-fill fs-5"></i>
+                            <span>Redemption Progress:</span>
+                            <strong class="font-monospace">@Model.TimesUsed / @Model.UsageLimit used</strong>
+                        </div>
+                        <span class="badge bg-primary">
+                            @((Model.UsageLimit > 0) ? $"{((double)Model.TimesUsed / Model.UsageLimit * 100):0.#}% quota utilized" : "0%")
+                        </span>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- Code & Title -->
+                        <div class="col-md-5">
+                            <label class="form-label fw-semibold">Coupon Code *</label>
+                            <input asp-for="Code" class="form-control font-monospace text-uppercase" placeholder="e.g. DIWALI25" required />
+                            <div class="form-text small">Unique alphanumeric promo code.</div>
+                            <span asp-validation-for="Code" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-7">
+                            <label class="form-label fw-semibold">Campaign Title *</label>
+                            <input asp-for="Title" class="form-control" placeholder="e.g. Festive Special 25% Off" required />
+                            <span asp-validation-for="Title" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Discount Type & Value -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Discount Type *</label>
+                            <select asp-for="Type" class="form-select" id="discountTypeSelect">
+                                <option value="@DiscountType.Percentage">Percentage Discount (%)</option>
+                                <option value="@DiscountType.FixedAmount">Fixed Amount (₹)</option>
+                                <option value="@DiscountType.CustomerTier">Customer Tier Discount</option>
+                                <option value="@DiscountType.FleetDiscount">Fleet Corporate Discount</option>
+                                <option value="@DiscountType.Seasonal">Seasonal Promotion</option>
+                            </select>
+                            <span asp-validation-for="Type" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold" id="valueLabel">Discount Value *</label>
+                            <div class="input-group">
+                                <span class="input-group-text" id="valuePrefix">%</span>
+                                <input asp-for="Value" class="form-control" type="number" step="0.01" min="0.01" required />
+                            </div>
+                            <div class="form-text small" id="valueHelp">Percentage rate to deduct from invoice subtotal.</div>
+                            <span asp-validation-for="Value" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Bill Limits & Cap -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Minimum Bill Amount (₹) *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">₹</span>
+                                <input asp-for="MinimumBillAmount" class="form-control" type="number" step="1" min="0" required />
+                            </div>
+                            <div class="form-text small">Minimum bill amount required for coupon application.</div>
+                            <span asp-validation-for="MinimumBillAmount" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Maximum Discount Cap (₹) *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">₹</span>
+                                <input asp-for="MaxDiscountLimit" class="form-control" type="number" step="1" min="0" required />
+                            </div>
+                            <div class="form-text small">Ceiling on monetary savings allowed per bill.</div>
+                            <span asp-validation-for="MaxDiscountLimit" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Usage Quota & Expiry Date -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Total Usage Limit *</label>
+                            <input asp-for="UsageLimit" class="form-control" type="number" min="@Math.Max(1, Model.TimesUsed)" step="1" required />
+                            <div class="form-text small">Cannot be less than the @Model.TimesUsed times already used.</div>
+                            <span asp-validation-for="UsageLimit" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Expiration Date *</label>
+                            <input asp-for="ExpiryDate" class="form-control" type="date" value="@Model.ExpiryDate.ToString("yyyy-MM-dd")" required />
+                            <div class="form-text small">Coupon validity ending date.</div>
+                            <span asp-validation-for="ExpiryDate" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                        <a asp-action="Coupons" class="btn btn-outline-secondary px-4">Cancel</a>
+                        <button type="submit" class="btn btn-primary px-4 fw-semibold shadow-sm">
+                            <i class="bi bi-check-circle-fill me-1"></i> Update Coupon
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const typeSelect = document.getElementById('discountTypeSelect');
+        const valuePrefix = document.getElementById('valuePrefix');
+        const valueHelp = document.getElementById('valueHelp');
+
+        function updatePrefix() {
+            if (typeSelect.value === '@DiscountType.FixedAmount') {
+                valuePrefix.textContent = '₹';
+                valueHelp.textContent = 'Flat rupee amount to deduct directly from the bill.';
+            } else {
+                valuePrefix.textContent = '%';
+                valueHelp.textContent = 'Percentage rate to deduct from invoice subtotal.';
+            }
+        }
+
+        typeSelect.addEventListener('change', updatePrefix);
+        updatePrefix();
+    </script>
+}

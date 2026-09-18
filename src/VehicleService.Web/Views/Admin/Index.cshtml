@@ -1,4 +1,4 @@
-﻿@model DashboardMetricsDto
+@model DashboardMetricsDto
 @{
     ViewData["Title"] = "Administrator System Overview";
     var serviceMetrics = ViewBag.ServiceMetrics as ServiceMetricsDto;
@@ -10,6 +10,11 @@
         <div>
             <h2 class="fw-bold mb-1"><i class="bi bi-shield-lock-fill text-primary"></i> Master Administration Console</h2>
             <p class="text-muted small mb-0">Platform-wide overview, revenue KPIs, service bay utilization & audit trail</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-controller="Inventory" asp-action="Index" class="btn btn-outline-success btn-sm"><i class="bi bi-boxes"></i> Spare Parts Catalog</a>
+            <a asp-controller="Admin" asp-action="ServiceCatalog" class="btn btn-outline-primary btn-sm"><i class="bi bi-journal-text"></i> Service Catalog</a>
+            <a asp-controller="Admin" asp-action="Users" class="btn btn-outline-secondary btn-sm"><i class="bi bi-people"></i> Users</a>
         </div>
     </div>
 

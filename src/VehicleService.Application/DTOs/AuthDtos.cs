@@ -1,4 +1,4 @@
-﻿using VehicleService.Domain.Enums;
+using VehicleService.Domain.Enums;
 
 namespace VehicleService.Application.DTOs;
 
@@ -46,3 +46,36 @@ public class UserProfileDto
     public int? ServiceCenterId { get; set; }
     public int? CompanyFleetId { get; set; }
 }
+
+public class UpdateUserDetailsDto
+{
+    public string Id { get; set; } = string.Empty;
+
+    [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Full name is required")]
+    [System.ComponentModel.DataAnnotations.StringLength(100)]
+    public string FullName { get; set; } = string.Empty;
+
+    [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Email is required")]
+    [System.ComponentModel.DataAnnotations.EmailAddress(ErrorMessage = "Invalid email address")]
+    public string Email { get; set; } = string.Empty;
+
+    [System.ComponentModel.DataAnnotations.Phone(ErrorMessage = "Invalid phone number")]
+    public string? PhoneNumber { get; set; }
+
+    public UserRoleType RoleType { get; set; } = UserRoleType.Customer;
+
+    public int? ServiceCenterId { get; set; }
+
+    public int? CompanyFleetId { get; set; }
+
+    public string? Address { get; set; }
+
+    public string? City { get; set; }
+
+    public string? State { get; set; }
+
+    public string? PostalCode { get; set; }
+
+    public bool IsActive { get; set; } = true;
+}
+

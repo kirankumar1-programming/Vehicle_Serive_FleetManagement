@@ -1,0 +1,151 @@
+@model CreateServiceCenterDto
+@{
+    ViewData["Title"] = "Add Service Center";
+}
+
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card p-4 shadow border-0">
+                <div class="d-flex align-items-center justify-content-between mb-4 pb-2 border-bottom">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="stat-icon primary p-3 rounded-circle bg-success-subtle text-success">
+                            <i class="bi bi-building-add fs-4"></i>
+                        </div>
+                        <div>
+                            <h3 class="fw-bold mb-0">Add New Service Center</h3>
+                            <p class="text-muted small mb-0">Register a new multi-bay facility, branch, or regional workshop hub</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div asp-validation-summary="All" class="text-danger small mb-3"></div>
+
+                <form asp-action="AddServiceCenter" method="post">
+                    @Html.AntiForgeryToken()
+
+                    <!-- Status Banner / Toggle -->
+                    <div class="card bg-light border-0 p-3 mb-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="fw-bold mb-1"><i class="bi bi-power text-primary me-1"></i> Initial Operational Status</h6>
+                                <p class="text-muted small mb-0">
+                                    Set whether this service center is immediately active and open for customer bookings upon creation.
+                                </p>
+                            </div>
+                            <div class="form-check form-switch fs-5">
+                                <input asp-for="IsActive" class="form-check-input cursor-pointer" type="checkbox" role="switch" id="addCenterIsActiveSwitch" checked />
+                                <label class="form-check-label fs-6 fw-semibold ms-1" for="addCenterIsActiveSwitch">
+                                    Active
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- Primary Identifiers -->
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold">Service Center Name *</label>
+                            <input asp-for="Name" class="form-control" placeholder="e.g. AutoPro Downtown Central Hub" required />
+                            <span asp-validation-for="Name" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Center Code *</label>
+                            <input asp-for="Code" class="form-control font-monospace" placeholder="e.g. SC-EAST-03" required />
+                            <span asp-validation-for="Code" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Operational Parameters -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Operating Hours *</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-clock"></i></span>
+                                <input asp-for="OperatingHours" class="form-control" placeholder="e.g. 08:00 AM - 07:00 PM" required />
+                            </div>
+                            <span asp-validation-for="OperatingHours" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Max Daily Capacity *</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-speedometer2"></i></span>
+                                <input asp-for="MaxDailyCapacity" type="number" class="form-control" min="1" max="500" required />
+                            </div>
+                            <span asp-validation-for="MaxDailyCapacity" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Initial Bays to Provision</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-tools"></i></span>
+                                <input asp-for="InitialBaysCount" type="number" class="form-control" min="0" max="20" />
+                            </div>
+                            <span asp-validation-for="InitialBaysCount" class="text-danger small"></span>
+                            <small class="text-muted">Auto-generate starter service bays (0 to 20)</small>
+                        </div>
+
+                        <!-- Contact Information -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Phone Number</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-telephone"></i></span>
+                                <input asp-for="Phone" class="form-control" placeholder="+91 80 1234 5678" />
+                            </div>
+                            <span asp-validation-for="Phone" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Email Address</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                                <input asp-for="Email" type="email" class="form-control" placeholder="hub.east@autoproservice.com" />
+                            </div>
+                            <span asp-validation-for="Email" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Location Information -->
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Physical Address *</label>
+                            <input asp-for="Address" class="form-control" placeholder="e.g. 78 Outer Ring Road, Tech Park" required />
+                            <span asp-validation-for="Address" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">City *</label>
+                            <input asp-for="City" class="form-control" placeholder="e.g. Bangalore" required />
+                            <span asp-validation-for="City" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">State / Region *</label>
+                            <input asp-for="State" class="form-control" placeholder="e.g. Karnataka" required />
+                            <span asp-validation-for="State" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                        <a asp-action="ServiceCenters" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancel
+                        </a>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success px-4">
+                                <i class="bi bi-plus-circle"></i> Create Service Center
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const switchEl = document.getElementById('addCenterIsActiveSwitch');
+            if (switchEl) {
+                switchEl.addEventListener('change', function () {
+                    const label = this.nextElementSibling;
+                    if (label) {
+                        label.textContent = this.checked ? 'Active' : 'Inactive';
+                    }
+                });
+            }
+        });
+    </script>
+}

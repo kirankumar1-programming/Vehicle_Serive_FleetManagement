@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using VehicleService.Application.DTOs;
 using VehicleService.Application.Interfaces;
 using VehicleService.Domain.Entities;
@@ -96,6 +96,13 @@ public class FleetManagementService : IFleetService
     public async Task<CompanyFleet> RegisterFleetAsync(CompanyFleet fleet)
     {
         await _unitOfWork.Repository<CompanyFleet>().AddAsync(fleet);
+        await _unitOfWork.SaveChangesAsync();
+        return fleet;
+    }
+
+    public async Task<CompanyFleet> UpdateFleetAsync(CompanyFleet fleet)
+    {
+        await _unitOfWork.Repository<CompanyFleet>().UpdateAsync(fleet);
         await _unitOfWork.SaveChangesAsync();
         return fleet;
     }
