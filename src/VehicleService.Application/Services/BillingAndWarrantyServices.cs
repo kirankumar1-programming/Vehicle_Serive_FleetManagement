@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using VehicleService.Application.DTOs;
 using VehicleService.Application.Interfaces;
 using VehicleService.Domain.Entities;
@@ -91,6 +91,11 @@ public class InvoiceService : IInvoiceService
             .FirstOrDefaultAsync(j => j.Id == jobCardId);
 
         if (jobCard == null) throw new DomainException("Job card not found.");
+
+        if (jobCard.Status == AppointmentStatus.Cancelled || jobCard.Appointment?.Status == AppointmentStatus.Cancelled)
+        {
+            throw new DomainException("Cannot generate an invoice for a cancelled job card or appointment.");
+        }
 
         var invoiceNumber = $"INV-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..5].ToUpper()}";
         var invoiceItems = new List<InvoiceItem>();

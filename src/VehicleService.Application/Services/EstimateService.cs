@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using VehicleService.Application.DTOs;
 using VehicleService.Application.Interfaces;
 using VehicleService.Domain.Entities;
@@ -49,6 +49,16 @@ public class EstimateService : IEstimateService
             .FirstOrDefaultAsync(j => j.Id == jobCardId);
 
         if (jobCard == null) throw new DomainException("Job card not found.");
+
+        if (jobCard.Status == AppointmentStatus.Cancelled || jobCard.Appointment?.Status == AppointmentStatus.Cancelled)
+        {
+            throw new DomainException("Cannot create an estimate for a cancelled appointment or job card.");
+        }
+
+        if (jobCard.Status == AppointmentStatus.Completed)
+        {
+            throw new DomainException("Cannot create an estimate for a completed job card.");
+        }
 
         var estimateNumber = $"EST-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..5].ToUpper()}";
 
@@ -103,6 +113,52 @@ public class EstimateService : IEstimateService
         await _unitOfWork.Repository<ServiceJobCard>().UpdateAsync(jobCard);
 
         await _unitOfWork.Repository<RepairEstimate>().AddAsync(estimate);
+
+        // Reserve parts included in the estimate for this appointment if not already reserved
+        if (jobCard.AppointmentId > 0)
+        {
+            foreach (var item in items.Where(i => i.ItemType == EstimateItemType.Part && i.InventoryPartId.HasValue))
+            {
+                var partId = item.InventoryPartId!.Value;
+                var qty = Math.Max(1, item.Quantity);
+                var alreadyReserved = await _unitOfWork.Repository<PartReservation>().Query()
+                    .AnyAsync(r => r.AppointmentId == jobCard.AppointmentId && r.InventoryPartId == partId && !r.IsReleased && !r.IsConsumed);
+
+                if (!alreadyReserved)
+                {
+                    var part = await _unitOfWork.Repository<InventoryPart>().GetByIdAsync(partId);
+                    if (part != null && part.AvailableQuantity >= qty)
+                    {
+                        int beforeAvail = part.AvailableQuantity;
+                        part.AvailableQuantity -= qty;
+                        part.ReservedQuantity += qty;
+                        await _unitOfWork.Repository<InventoryPart>().UpdateAsync(part);
+
+                        await _unitOfWork.Repository<PartReservation>().AddAsync(new PartReservation
+                        {
+                            InventoryPartId = partId,
+                            AppointmentId = jobCard.AppointmentId,
+                            Quantity = qty,
+                            IsReleased = false
+                        });
+
+                        await _unitOfWork.Repository<InventoryTransaction>().AddAsync(new InventoryTransaction
+                        {
+                            InventoryPartId = part.Id,
+                            TransactionType = InventoryTransactionType.Reservation,
+                            Quantity = qty,
+                            QuantityBefore = beforeAvail,
+                            QuantityAfter = part.AvailableQuantity,
+                            UnitCost = part.CostPrice,
+                            TotalAmount = part.CostPrice * qty,
+                            ReferenceNumber = estimateNumber,
+                            Notes = $"Stock reserved for Estimate {estimateNumber} on Job Card {jobCard.JobCardNumber}"
+                        });
+                    }
+                }
+            }
+        }
+
         await _unitOfWork.SaveChangesAsync();
 
         if (jobCard.Appointment?.CustomerId != null)
@@ -129,6 +185,18 @@ public class EstimateService : IEstimateService
 
         if (estimate == null) throw new DomainException("Estimate not found.");
 
+        if (estimate.JobCard == null) throw new DomainException("Job card not found.");
+
+        if (estimate.JobCard.Status == AppointmentStatus.Cancelled || estimate.JobCard.Appointment?.Status == AppointmentStatus.Cancelled)
+        {
+            throw new DomainException("Cannot approve or update an estimate for a cancelled appointment or job card.");
+        }
+
+        if (estimate.JobCard.Status == AppointmentStatus.Completed || estimate.JobCard.Appointment?.Status == AppointmentStatus.Completed)
+        {
+            throw new DomainException("Cannot process estimate for a completed job card.");
+        }
+
         estimate.CustomerNotes = response.CustomerNotes;
         estimate.CustomerRespondedAt = DateTime.UtcNow;
 
@@ -143,10 +211,15 @@ public class EstimateService : IEstimateService
             }
 
             // Job proceeds ONLY with basic/original scheduled package services, excluding rejected additional repairs
-            if (estimate.JobCard != null)
+            if (estimate.JobCard != null && estimate.JobCard.Status != AppointmentStatus.Cancelled && estimate.JobCard.Appointment?.Status != AppointmentStatus.Cancelled)
             {
                 estimate.JobCard.Status = AppointmentStatus.InProgress;
                 estimate.JobCard.MechanicNotes = (estimate.JobCard.MechanicNotes + $"\n[Customer Decision]: Additional repairs rejected ({response.CustomerNotes}). Proceeding with standard base service only.").Trim();
+                if (estimate.JobCard.Appointment != null && estimate.JobCard.Appointment.Status != AppointmentStatus.Cancelled)
+                {
+                    estimate.JobCard.Appointment.Status = AppointmentStatus.InProgress;
+                    await _unitOfWork.Repository<ServiceAppointment>().UpdateAsync(estimate.JobCard.Appointment);
+                }
                 await _unitOfWork.Repository<ServiceJobCard>().UpdateAsync(estimate.JobCard);
             }
         }
@@ -181,10 +254,19 @@ public class EstimateService : IEstimateService
             estimate.TaxAmount = approvedItems.Sum(i => (i.UnitPrice * i.Quantity + i.LaborCharges) * (i.TaxPercent / 100m));
             estimate.GrandTotal = estimate.TotalPartsCost + estimate.TotalLaborCost + estimate.TaxAmount - estimate.DiscountAmount;
 
-            // Job advances to InProgress
-            if (estimate.JobCard != null)
+            // Job advances to InProgress only if not cancelled
+            if (estimate.JobCard != null && estimate.JobCard.Status != AppointmentStatus.Cancelled && estimate.JobCard.Appointment?.Status != AppointmentStatus.Cancelled)
             {
                 estimate.JobCard.Status = AppointmentStatus.InProgress;
+                if (!estimate.JobCard.WorkStartedAt.HasValue)
+                {
+                    estimate.JobCard.WorkStartedAt = DateTime.UtcNow;
+                }
+                if (estimate.JobCard.Appointment != null && estimate.JobCard.Appointment.Status != AppointmentStatus.Cancelled)
+                {
+                    estimate.JobCard.Appointment.Status = AppointmentStatus.InProgress;
+                    await _unitOfWork.Repository<ServiceAppointment>().UpdateAsync(estimate.JobCard.Appointment);
+                }
                 await _unitOfWork.Repository<ServiceJobCard>().UpdateAsync(estimate.JobCard);
             }
         }
@@ -212,8 +294,16 @@ public class EstimateService : IEstimateService
 
     public async Task ClarifyEstimateAsync(int estimateId, string clarificationQuestion)
     {
-        var estimate = await _unitOfWork.Repository<RepairEstimate>().GetByIdAsync(estimateId);
+        var estimate = await _unitOfWork.Repository<RepairEstimate>().Query()
+            .Include(e => e.JobCard).ThenInclude(j => j!.Appointment)
+            .FirstOrDefaultAsync(e => e.Id == estimateId);
+
         if (estimate == null) throw new DomainException("Estimate not found.");
+
+        if (estimate.JobCard != null && (estimate.JobCard.Status == AppointmentStatus.Cancelled || estimate.JobCard.Appointment?.Status == AppointmentStatus.Cancelled))
+        {
+            throw new DomainException("Cannot request clarification for a cancelled job card or appointment.");
+        }
 
         estimate.ClarificationQuestion = clarificationQuestion;
         estimate.ApprovalStatus = EstimateApprovalStatus.ClarificationRequested;
@@ -228,6 +318,11 @@ public class EstimateService : IEstimateService
             .FirstOrDefaultAsync(e => e.Id == estimateId);
 
         if (estimate == null) throw new DomainException("Estimate not found.");
+
+        if (estimate.JobCard != null && (estimate.JobCard.Status == AppointmentStatus.Cancelled || estimate.JobCard.Appointment?.Status == AppointmentStatus.Cancelled))
+        {
+            throw new DomainException("Cannot reply to clarification for a cancelled job card or appointment.");
+        }
 
         estimate.AdvisorReply = advisorReply;
         estimate.ApprovalStatus = EstimateApprovalStatus.Pending; // Back to pending customer action
@@ -269,6 +364,8 @@ public class EstimateService : IEstimateService
             CustomerRespondedAt = e.CustomerRespondedAt,
             ClarificationQuestion = e.ClarificationQuestion,
             AdvisorReply = e.AdvisorReply,
+            JobCardStatus = e.JobCard?.Status,
+            AppointmentStatus = e.JobCard?.Appointment?.Status,
             Items = e.Items?.Select(i => new EstimateItemDto
             {
                 Id = i.Id,

@@ -180,21 +180,70 @@ public class CustomerController : Controller
     [HttpGet]
     public async Task<IActionResult> BookService(int? vehicleId = null)
     {
-        var vehicles = await _vehicleService.GetCustomerVehiclesAsync(CurrentUserId);
+        var user = await _userManager.GetUserAsync(User);
+        var vehicles = (await _vehicleService.GetCustomerVehiclesAsync(CurrentUserId)).ToList();
+
+        // If fleet manager or has fleet ID, also include fleet vehicles
+        if (user?.CompanyFleetId.HasValue == true)
+        {
+            var fleetVehicles = await _vehicleService.GetFleetVehiclesAsync(user.CompanyFleetId.Value);
+            foreach (var fv in fleetVehicles)
+            {
+                if (!vehicles.Any(v => v.Id == fv.Id))
+                {
+                    vehicles.Add(fv);
+                }
+            }
+        }
+        else if (User.IsInRole("FleetManager") || User.IsInRole("Administrator"))
+        {
+            var allVehicles = await _vehicleService.GetAllVehiclesAsync();
+            foreach (var av in allVehicles)
+            {
+                if (!vehicles.Any(v => v.Id == av.Id))
+                {
+                    vehicles.Add(av);
+                }
+            }
+        }
+
+        // If vehicleId is specified (e.g. from Preventive Maintenance), ensure it is loaded and in the list
+        if (vehicleId.HasValue && !vehicles.Any(v => v.Id == vehicleId.Value))
+        {
+            var targetVehicle = await _vehicleService.GetVehicleByIdAsync(vehicleId.Value);
+            if (targetVehicle != null)
+            {
+                vehicles.Add(targetVehicle);
+            }
+        }
+
         var activeVehicles = vehicles.Where(v => v.IsActive).ToList();
+        // If a specific vehicleId was requested but it's inactive, still allow it to be included
+        if (vehicleId.HasValue && !activeVehicles.Any(v => v.Id == vehicleId.Value))
+        {
+            var targetVehicle = vehicles.FirstOrDefault(v => v.Id == vehicleId.Value);
+            if (targetVehicle != null)
+            {
+                activeVehicles.Insert(0, targetVehicle);
+            }
+        }
+
         var serviceTypes = await _unitOfWork.Repository<ServiceType>().FindAsync(s => s.IsActive);
         var servicePackages = await _unitOfWork.Repository<ServicePackage>().FindAsync(p => p.IsActive);
         var serviceCenters = await _unitOfWork.Repository<ServiceCenter>().FindAsync(c => c.IsActive);
+
+        int selectedVehicleId = vehicleId ?? (activeVehicles.FirstOrDefault()?.Id ?? 0);
 
         ViewBag.Vehicles = activeVehicles;
         ViewBag.ServiceTypes = serviceTypes;
         ViewBag.ServicePackages = servicePackages;
         ViewBag.ServiceCenters = serviceCenters;
+        ViewBag.SelectedVehicle = activeVehicles.FirstOrDefault(v => v.Id == selectedVehicleId);
 
         var model = new BookAppointmentDto
         {
             CustomerId = CurrentUserId,
-            VehicleId = vehicleId ?? (vehicles.FirstOrDefault()?.Id ?? 0),
+            VehicleId = selectedVehicleId,
             AppointmentDate = DateTime.UtcNow.Date.AddDays(1),
             TimeSlot = "09:00 AM - 11:00 AM"
         };
@@ -228,7 +277,30 @@ public class CustomerController : Controller
     // Appointments List
     public async Task<IActionResult> Appointments()
     {
-        var appointments = await _appointmentService.GetCustomerAppointmentsAsync(CurrentUserId);
+        var user = await _userManager.GetUserAsync(User);
+        IReadOnlyList<AppointmentDto> appointments;
+        if (User.IsInRole("FleetManager") || User.IsInRole("Administrator"))
+        {
+            var allAppts = await _appointmentService.GetAllAppointmentsAsync();
+            if (user?.CompanyFleetId.HasValue == true)
+            {
+                var fleetVehicles = await _vehicleService.GetFleetVehiclesAsync(user.CompanyFleetId.Value);
+                var fleetVehicleIds = fleetVehicles.Select(v => v.Id).ToHashSet();
+                appointments = allAppts.Where(a => a.CustomerId == CurrentUserId || fleetVehicleIds.Contains(a.VehicleId)).ToList();
+            }
+            else if (User.IsInRole("Administrator"))
+            {
+                appointments = allAppts;
+            }
+            else
+            {
+                appointments = allAppts.Where(a => a.CustomerId == CurrentUserId).ToList();
+            }
+        }
+        else
+        {
+            appointments = await _appointmentService.GetCustomerAppointmentsAsync(CurrentUserId);
+        }
         return View(appointments);
     }
 

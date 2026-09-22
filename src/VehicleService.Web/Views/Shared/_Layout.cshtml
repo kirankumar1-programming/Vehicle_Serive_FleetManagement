@@ -21,6 +21,20 @@
             return "active";
         return "";
     }
+
+    string IsDropdownActive(params (string Controller, string[] Actions)[] items)
+    {
+        foreach (var item in items)
+        {
+            if (string.Equals(currentController, item.Controller, StringComparison.OrdinalIgnoreCase))
+            {
+                if (item.Actions.Length == 0) return "active";
+                if (item.Actions.Any(a => string.Equals(currentAction, a, StringComparison.OrdinalIgnoreCase)))
+                    return "active";
+            }
+        }
+        return "";
+    }
 }
 
 <!DOCTYPE html>
@@ -150,15 +164,72 @@
                         }
                         else if (userRole == "Administrator")
                         {
-                            <li class="nav-item"><a class="nav-link @IsActive("Admin", "Index")" asp-controller="Admin" asp-action="Index"><i class="bi bi-cpu"></i> System Overview</a></li>
-                            <li class="nav-item"><a class="nav-link @IsActive("Admin", "Users", new[] { "EditUser" })" asp-controller="Admin" asp-action="Users"><i class="bi bi-people"></i> Users & Roles</a></li>
-                            <li class="nav-item"><a class="nav-link @IsActive("Admin", "Fleets", new[] { "AddFleet", "EditFleet" })" asp-controller="Admin" asp-action="Fleets"><i class="bi bi-truck"></i> Corporate Fleets</a></li>
-                            <li class="nav-item"><a class="nav-link @IsActive("Admin", "ServiceCenters", new[] { "AddServiceCenter", "EditServiceCenter", "AddServiceBay", "EditServiceBay" })" asp-controller="Admin" asp-action="ServiceCenters"><i class="bi bi-building"></i> Centers & Bays</a></li>
-                            <li class="nav-item"><a class="nav-link @IsActive("Admin", "ServiceCatalog", new[] { "EditServiceType", "AddServicePackage", "EditServicePackage" })" asp-controller="Admin" asp-action="ServiceCatalog"><i class="bi bi-journal-text"></i> Service Catalog</a></li>
-                            <li class="nav-item"><a class="nav-link @IsActive("Inventory", "Index", new[] { "AddPart", "EditPart", "LowStock", "Transactions" })" asp-controller="Inventory" asp-action="Index"><i class="bi bi-boxes"></i> Spare Parts</a></li>
-                            <li class="nav-item"><a class="nav-link @IsActive("Admin", "Coupons", new[] { "AddCoupon", "EditCoupon" })" asp-controller="Admin" asp-action="Coupons"><i class="bi bi-tag"></i> Coupons</a></li>
-                            <li class="nav-item"><a class="nav-link @IsActive("Admin", "AuditLogs")" asp-controller="Admin" asp-action="AuditLogs"><i class="bi bi-fingerprint"></i> Audit Trail</a></li>
-                            <li class="nav-item"><a class="nav-link @IsActive("Admin", "Reviews")" asp-controller="Admin" asp-action="Reviews"><i class="bi bi-star"></i> Reviews</a></li>
+                            <li class="nav-item">
+                                <a class="nav-link @IsActive("Admin", "Index")" asp-controller="Admin" asp-action="Index">
+                                    <i class="bi bi-cpu"></i> System Overview
+                                </a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle @IsDropdownActive(("Admin", new[] { "Users", "EditUser", "Fleets", "AddFleet", "EditFleet", "ServiceCenters", "AddServiceCenter", "EditServiceCenter", "AddServiceBay", "EditServiceBay" }))" href="#" role="button" data-bs-toggle="dropdown">
+                                    <i class="bi bi-building-gear"></i> Operations
+                                </a>
+                                <ul class="dropdown-menu shadow">
+                                    <li>
+                                        <a class="dropdown-item @IsActive("Admin", "Users", new[] { "EditUser" })" asp-controller="Admin" asp-action="Users">
+                                            <i class="bi bi-people me-2"></i> Users & Roles
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item @IsActive("Admin", "Fleets", new[] { "AddFleet", "EditFleet" })" asp-controller="Admin" asp-action="Fleets">
+                                            <i class="bi bi-truck me-2"></i> Corporate Fleets
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item @IsActive("Admin", "ServiceCenters", new[] { "AddServiceCenter", "EditServiceCenter", "AddServiceBay", "EditServiceBay" })" asp-controller="Admin" asp-action="ServiceCenters">
+                                            <i class="bi bi-building me-2"></i> Centers & Bays
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle @IsDropdownActive(("Admin", new[] { "ServiceCatalog", "EditServiceType", "AddServicePackage", "EditServicePackage", "Coupons", "AddCoupon", "EditCoupon" }), ("Inventory", new[] { "Index", "AddPart", "EditPart", "LowStock", "Transactions" }))" href="#" role="button" data-bs-toggle="dropdown">
+                                    <i class="bi bi-boxes"></i> Catalog & Stock
+                                </a>
+                                <ul class="dropdown-menu shadow">
+                                    <li>
+                                        <a class="dropdown-item @IsActive("Admin", "ServiceCatalog", new[] { "EditServiceType", "AddServicePackage", "EditServicePackage" })" asp-controller="Admin" asp-action="ServiceCatalog">
+                                            <i class="bi bi-journal-text me-2"></i> Service Catalog
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item @IsActive("Inventory", "Index", new[] { "AddPart", "EditPart", "LowStock", "Transactions" })" asp-controller="Inventory" asp-action="Index">
+                                            <i class="bi bi-boxes me-2"></i> Spare Parts Catalog
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item @IsActive("Admin", "Coupons", new[] { "AddCoupon", "EditCoupon" })" asp-controller="Admin" asp-action="Coupons">
+                                            <i class="bi bi-tag me-2"></i> Promo Coupons
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle @IsDropdownActive(("Admin", new[] { "AuditLogs", "Reviews" }))" href="#" role="button" data-bs-toggle="dropdown">
+                                    <i class="bi bi-shield-check"></i> Audit & Feedback
+                                </a>
+                                <ul class="dropdown-menu shadow">
+                                    <li>
+                                        <a class="dropdown-item @IsActive("Admin", "AuditLogs")" asp-controller="Admin" asp-action="AuditLogs">
+                                            <i class="bi bi-fingerprint me-2"></i> Audit Trail
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item @IsActive("Admin", "Reviews")" asp-controller="Admin" asp-action="Reviews">
+                                            <i class="bi bi-star me-2"></i> Customer Reviews
+                                        </a>
+                                    </li>
+                                </ul>
+                            </li>
                         }
                     }
                     else
@@ -189,7 +260,7 @@
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" role="button" data-bs-toggle="dropdown">
                                 <span class="badge bg-light text-dark border"><i class="bi bi-person-badge"></i> @userRole</span>
-                                <span class="fw-semibold">@userName</span>
+                                <span class="fw-semibold nav-profile-name">@userName</span>
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end shadow">
                                 <li><span class="dropdown-item-text text-muted small">Signed in as <strong>@userName</strong></span></li>

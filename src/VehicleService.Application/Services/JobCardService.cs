@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using VehicleService.Application.DTOs;
 using VehicleService.Application.Interfaces;
 using VehicleService.Domain.Entities;
@@ -88,13 +88,26 @@ public class JobCardService : IJobCardService
         return j == null ? null : MapToDto(j);
     }
 
-    public async Task<JobCardDto> CreateJobCardFromAppointmentAsync(int appointmentId, string advisorId, int? bayId = null)
+    public async Task<JobCardDto> CreateJobCardFromAppointmentAsync(int appointmentId, string advisorId, int? bayId = null, List<int>? partIdsToReserve = null)
     {
         var appointment = await _unitOfWork.Repository<ServiceAppointment>().Query()
             .Include(a => a.Vehicle)
+            .Include(a => a.ServiceType)
+            .Include(a => a.ServicePackage).ThenInclude(sp => sp!.PackageItems).ThenInclude(pi => pi.ServiceType)
+            .Include(a => a.PartReservations)
             .FirstOrDefaultAsync(a => a.Id == appointmentId);
 
         if (appointment == null) throw new DomainException("Appointment not found.");
+
+        if (appointment.Status == AppointmentStatus.Cancelled)
+        {
+            throw new DomainException("Cannot create a job card for a cancelled appointment.");
+        }
+
+        if (appointment.Status == AppointmentStatus.Completed)
+        {
+            throw new DomainException("Cannot create a job card for a completed appointment.");
+        }
 
         var existingJobCard = await _unitOfWork.Repository<ServiceJobCard>()
             .FirstOrDefaultAsync(j => j.AppointmentId == appointmentId);
@@ -121,14 +134,116 @@ public class JobCardService : IJobCardService
         await _unitOfWork.Repository<ServiceJobCard>().AddAsync(jobCard);
         await _unitOfWork.SaveChangesAsync();
 
+        // ---------------------------------------------------------
+        // Reserve Spare Parts upon Job Card Creation
+        // ---------------------------------------------------------
+        var targetPartIds = new List<int>();
+        if (partIdsToReserve != null && partIdsToReserve.Count > 0)
+        {
+            targetPartIds.AddRange(partIdsToReserve.Distinct());
+        }
+        else
+        {
+            // Auto-detect recommended parts if appointment does not already have active reservations
+            var existingReservations = appointment.PartReservations?
+                .Where(r => !r.IsReleased && !r.IsConsumed).ToList() ?? new List<PartReservation>();
+
+            if (existingReservations.Count == 0)
+            {
+                var allParts = await _unitOfWork.Repository<InventoryPart>().Query()
+                    .Where(p => p.IsActive && p.AvailableQuantity > 0)
+                    .ToListAsync();
+
+                var serviceName = (appointment.ServiceType?.Name ?? string.Empty).ToLowerInvariant();
+                var serviceCat = (appointment.ServiceType?.Category ?? string.Empty).ToLowerInvariant();
+                var packageDesc = (appointment.ServicePackage?.Name ?? string.Empty).ToLowerInvariant();
+
+                // Periodic / General Service / Oil Service -> reserve Engine Oil & Oil Filter
+                if (serviceName.Contains("general") || serviceName.Contains("periodic") || packageDesc.Contains("periodic") || serviceName.Contains("oil"))
+                {
+                    var oil = allParts.FirstOrDefault(p => p.Category.Equals("Fluids", StringComparison.OrdinalIgnoreCase) || p.PartNumber.Contains("OIL"));
+                    var filter = allParts.FirstOrDefault(p => p.Category.Equals("Filters", StringComparison.OrdinalIgnoreCase) || p.PartNumber.Contains("FIL"));
+                    if (oil != null) targetPartIds.Add(oil.Id);
+                    if (filter != null) targetPartIds.Add(filter.Id);
+                }
+
+                // Brake service -> reserve Brake Pads
+                if (serviceName.Contains("brake") || serviceCat.Contains("brake"))
+                {
+                    var brake = allParts.FirstOrDefault(p => p.Category.Equals("Brakes", StringComparison.OrdinalIgnoreCase) || p.PartNumber.Contains("BP"));
+                    if (brake != null) targetPartIds.Add(brake.Id);
+                }
+
+                // Battery / Electrical -> reserve Battery
+                if (serviceName.Contains("battery") || serviceName.Contains("electrical"))
+                {
+                    var bat = allParts.FirstOrDefault(p => p.Category.Equals("Electrical", StringComparison.OrdinalIgnoreCase) || p.PartNumber.Contains("BAT"));
+                    if (bat != null) targetPartIds.Add(bat.Id);
+                }
+            }
+        }
+
+        // Apply reservations and update inventory stock counters
+        foreach (var partId in targetPartIds.Distinct())
+        {
+            var alreadyReserved = await _unitOfWork.Repository<PartReservation>().Query()
+                .AnyAsync(r => r.AppointmentId == appointmentId && r.InventoryPartId == partId && !r.IsReleased && !r.IsConsumed);
+
+            if (!alreadyReserved)
+            {
+                var part = await _unitOfWork.Repository<InventoryPart>().GetByIdAsync(partId);
+                if (part != null && part.AvailableQuantity > 0)
+                {
+                    int beforeAvail = part.AvailableQuantity;
+                    part.AvailableQuantity -= 1;
+                    part.ReservedQuantity += 1;
+                    await _unitOfWork.Repository<InventoryPart>().UpdateAsync(part);
+
+                    await _unitOfWork.Repository<PartReservation>().AddAsync(new PartReservation
+                    {
+                        InventoryPartId = partId,
+                        AppointmentId = appointmentId,
+                        Quantity = 1,
+                        IsReleased = false
+                    });
+
+                    await _unitOfWork.Repository<InventoryTransaction>().AddAsync(new InventoryTransaction
+                    {
+                        InventoryPartId = part.Id,
+                        TransactionType = InventoryTransactionType.Reservation,
+                        Quantity = 1,
+                        QuantityBefore = beforeAvail,
+                        QuantityAfter = part.AvailableQuantity,
+                        UnitCost = part.CostPrice,
+                        TotalAmount = part.CostPrice,
+                        ReferenceNumber = jobCardNumber,
+                        Notes = $"Stock reserved upon Job Card {jobCardNumber} creation"
+                    });
+                }
+            }
+        }
+
+        await _unitOfWork.SaveChangesAsync();
+
         return (await GetJobCardByIdAsync(jobCard.Id))!;
     }
 
     // SCENARIO 6: Mechanic Availability Validation
     public async Task AssignMechanicAsync(int jobCardId, string mechanicId)
     {
-        var jobCard = await _unitOfWork.Repository<ServiceJobCard>().GetByIdAsync(jobCardId);
+        var jobCard = await _unitOfWork.Repository<ServiceJobCard>().Query()
+            .Include(j => j.Appointment)
+            .FirstOrDefaultAsync(j => j.Id == jobCardId);
         if (jobCard == null) throw new DomainException("Job Card not found.");
+
+        if (jobCard.Status == AppointmentStatus.Cancelled || jobCard.Appointment?.Status == AppointmentStatus.Cancelled)
+        {
+            throw new DomainException("Cannot assign mechanic to a cancelled job card.");
+        }
+        if (jobCard.Status == AppointmentStatus.Completed)
+        {
+            throw new DomainException("Cannot assign mechanic to a completed job card.");
+        }
 
         // Check if mechanic is already engaged in an active, in-progress job
         var activeJobs = await _unitOfWork.Repository<ServiceJobCard>().Query()
@@ -163,6 +278,16 @@ public class JobCardService : IJobCardService
             .FirstOrDefaultAsync(j => j.Id == jobCardId);
 
         if (jobCard == null) throw new DomainException("Job card not found.");
+
+        if (jobCard.Status == AppointmentStatus.Cancelled || jobCard.Appointment?.Status == AppointmentStatus.Cancelled)
+        {
+            throw new DomainException("Cannot update status of a cancelled job card.");
+        }
+
+        if (jobCard.Status == AppointmentStatus.Completed)
+        {
+            throw new DomainException("Cannot update status of a completed job card.");
+        }
 
         jobCard.Status = newStatus;
         if (jobCard.Appointment != null)
@@ -223,8 +348,19 @@ public class JobCardService : IJobCardService
 
     public async Task AddWorkLogAsync(int jobCardId, string mechanicId, string taskDesc, decimal hours, string? observations)
     {
-        var jobCard = await _unitOfWork.Repository<ServiceJobCard>().GetByIdAsync(jobCardId);
+        var jobCard = await _unitOfWork.Repository<ServiceJobCard>().Query()
+            .Include(j => j.Appointment)
+            .FirstOrDefaultAsync(j => j.Id == jobCardId);
         if (jobCard == null) throw new DomainException("Job Card not found.");
+
+        if (jobCard.Status == AppointmentStatus.Cancelled || jobCard.Appointment?.Status == AppointmentStatus.Cancelled)
+        {
+            throw new DomainException("Cannot log labor for a cancelled job card.");
+        }
+        if (jobCard.Status == AppointmentStatus.Completed)
+        {
+            throw new DomainException("Cannot log labor for a completed job card.");
+        }
 
         var log = new WorkLog
         {
@@ -245,8 +381,19 @@ public class JobCardService : IJobCardService
 
     public async Task RecordReplacedPartAsync(int jobCardId, int partId, int quantity, string loggedByUserId)
     {
-        var jobCard = await _unitOfWork.Repository<ServiceJobCard>().GetByIdAsync(jobCardId);
+        var jobCard = await _unitOfWork.Repository<ServiceJobCard>().Query()
+            .Include(j => j.Appointment)
+            .FirstOrDefaultAsync(j => j.Id == jobCardId);
         if (jobCard == null) throw new DomainException("Job card not found.");
+
+        if (jobCard.Status == AppointmentStatus.Cancelled || jobCard.Appointment?.Status == AppointmentStatus.Cancelled)
+        {
+            throw new DomainException("Cannot record replaced parts for a cancelled job card.");
+        }
+        if (jobCard.Status == AppointmentStatus.Completed)
+        {
+            throw new DomainException("Cannot record replaced parts for a completed job card.");
+        }
 
         var part = await _unitOfWork.Repository<InventoryPart>().GetByIdAsync(partId);
         if (part == null) throw new DomainException("Part not found.");
@@ -265,6 +412,158 @@ public class JobCardService : IJobCardService
 
         await _unitOfWork.Repository<PartConsumption>().AddAsync(consumption);
         await _unitOfWork.SaveChangesAsync();
+    }
+
+    public async Task UpdateJobCardDetailsAsync(UpdateJobCardDto dto)
+    {
+        var jobCard = await _unitOfWork.Repository<ServiceJobCard>().Query()
+            .Include(j => j.Appointment)
+            .Include(j => j.Vehicle)
+            .FirstOrDefaultAsync(j => j.Id == dto.JobCardId);
+
+        if (jobCard == null) throw new DomainException("Job card not found.");
+
+        if (jobCard.Status == AppointmentStatus.Completed || jobCard.Status == AppointmentStatus.Cancelled || jobCard.Appointment?.Status == AppointmentStatus.Cancelled)
+        {
+            throw new DomainException($"Cannot edit job card in '{jobCard.Status}' status.");
+        }
+
+        if (dto.OdometerIn > 0)
+        {
+            jobCard.OdometerIn = dto.OdometerIn;
+        }
+
+        if (dto.OdometerOut.HasValue && dto.OdometerOut.Value > 0)
+        {
+            jobCard.OdometerOut = dto.OdometerOut.Value;
+        }
+
+        if (dto.AdvisorObservations != null)
+        {
+            jobCard.AdvisorObservations = dto.AdvisorObservations.Trim();
+        }
+
+        if (dto.MechanicNotes != null)
+        {
+            jobCard.MechanicNotes = dto.MechanicNotes.Trim();
+        }
+
+        if (dto.QualityCheckNotes != null)
+        {
+            jobCard.QualityCheckNotes = dto.QualityCheckNotes.Trim();
+        }
+
+        if (dto.Recommendations != null)
+        {
+            jobCard.Recommendations = dto.Recommendations.Trim();
+        }
+
+        if (dto.ServiceBayId.HasValue)
+        {
+            jobCard.ServiceBayId = dto.ServiceBayId.Value > 0 ? dto.ServiceBayId.Value : null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.MechanicId) && dto.MechanicId != jobCard.MechanicId)
+        {
+            await AssignMechanicAsync(jobCard.Id, dto.MechanicId);
+        }
+
+        if (dto.Status.HasValue && dto.Status.Value != jobCard.Status)
+        {
+            await UpdateJobCardStatusAsync(jobCard.Id, dto.Status.Value);
+        }
+        else
+        {
+            await _unitOfWork.Repository<ServiceJobCard>().UpdateAsync(jobCard);
+            await _unitOfWork.SaveChangesAsync();
+        }
+    }
+
+    public async Task<bool> CancelJobCardAsync(int jobCardId, string reason, string cancelledByUserId)
+    {
+        var jobCard = await _unitOfWork.Repository<ServiceJobCard>().Query()
+            .Include(j => j.Appointment).ThenInclude(a => a!.PartReservations)
+            .Include(j => j.Appointment).ThenInclude(a => a!.Customer)
+            .Include(j => j.Vehicle)
+            .FirstOrDefaultAsync(j => j.Id == jobCardId);
+
+        if (jobCard == null) return false;
+
+        if (jobCard.Status == AppointmentStatus.Completed || jobCard.Status == AppointmentStatus.Cancelled)
+        {
+            throw new DomainException($"Cannot cancel job card in '{jobCard.Status}' status.");
+        }
+
+        // 1. Update Job Card Status & Notes
+        jobCard.Status = AppointmentStatus.Cancelled;
+        var cancellationNote = $"[Cancelled on {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC]: {reason}";
+        jobCard.MechanicNotes = string.IsNullOrWhiteSpace(jobCard.MechanicNotes)
+            ? cancellationNote
+            : $"{jobCard.MechanicNotes}\n{cancellationNote}";
+
+        // Release bay
+        jobCard.ServiceBayId = null;
+
+        await _unitOfWork.Repository<ServiceJobCard>().UpdateAsync(jobCard);
+
+        // 2. Synchronize Appointment Status & Release Reserved Parts
+        if (jobCard.Appointment != null)
+        {
+            jobCard.Appointment.Status = AppointmentStatus.Cancelled;
+            jobCard.Appointment.CancellationReason = reason;
+            jobCard.Appointment.CancelledAt = DateTime.UtcNow;
+            jobCard.Appointment.ServiceBayId = null;
+
+            await _unitOfWork.Repository<ServiceAppointment>().UpdateAsync(jobCard.Appointment);
+
+            // Release all active reserved parts back to inventory
+            var reservations = await _unitOfWork.Repository<PartReservation>().Query()
+                .Where(r => r.AppointmentId == jobCard.AppointmentId && !r.IsReleased && !r.IsConsumed)
+                .ToListAsync();
+
+            foreach (var reservation in reservations)
+            {
+                reservation.IsReleased = true;
+                reservation.ReleasedAt = DateTime.UtcNow;
+                await _unitOfWork.Repository<PartReservation>().UpdateAsync(reservation);
+
+                var part = await _unitOfWork.Repository<InventoryPart>().GetByIdAsync(reservation.InventoryPartId);
+                if (part != null)
+                {
+                    int beforeAvail = part.AvailableQuantity;
+                    part.AvailableQuantity += reservation.Quantity;
+                    part.ReservedQuantity = Math.Max(0, part.ReservedQuantity - reservation.Quantity);
+                    await _unitOfWork.Repository<InventoryPart>().UpdateAsync(part);
+
+                    await _unitOfWork.Repository<InventoryTransaction>().AddAsync(new InventoryTransaction
+                    {
+                        InventoryPartId = part.Id,
+                        TransactionType = InventoryTransactionType.ReservationRelease,
+                        Quantity = reservation.Quantity,
+                        QuantityBefore = beforeAvail,
+                        QuantityAfter = part.AvailableQuantity,
+                        UnitCost = part.CostPrice,
+                        TotalAmount = part.CostPrice * reservation.Quantity,
+                        ReferenceNumber = jobCard.JobCardNumber,
+                        Notes = $"Released from cancelled Job Card {jobCard.JobCardNumber}"
+                    });
+                }
+            }
+
+            // 3. Notify Customer
+            if (!string.IsNullOrEmpty(jobCard.Appointment.CustomerId))
+            {
+                await _notificationService.SendNotificationAsync(
+                    jobCard.Appointment.CustomerId,
+                    "Service Job Cancelled",
+                    $"Job card {jobCard.JobCardNumber} for vehicle {jobCard.Vehicle?.Make} {jobCard.Vehicle?.Model} ({jobCard.Vehicle?.RegistrationNumber}) has been cancelled. Reason: {reason}",
+                    NotificationType.Appointment,
+                    $"/Customer/Appointments");
+            }
+        }
+
+        await _unitOfWork.SaveChangesAsync();
+        return true;
     }
 
     private static JobCardDto MapToDto(ServiceJobCard j)

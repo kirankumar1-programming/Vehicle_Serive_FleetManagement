@@ -5,6 +5,7 @@
     var serviceTypes = ViewBag.ServiceTypes as IReadOnlyList<ServiceType> ?? new List<ServiceType>();
     var servicePackages = ViewBag.ServicePackages as IReadOnlyList<ServicePackage> ?? new List<ServicePackage>();
     var serviceCenters = ViewBag.ServiceCenters as IReadOnlyList<ServiceCenter> ?? new List<ServiceCenter>();
+    var selectedVehicle = ViewBag.SelectedVehicle as VehicleDto ?? vehicles.FirstOrDefault(v => v.Id == Model.VehicleId) ?? vehicles.FirstOrDefault();
 }
 
 <div class="container my-4">
@@ -27,20 +28,71 @@
                         <h5 class="form-step-header mb-3"><i class="bi bi-1-circle-fill"></i> Select Vehicle</h5>
                         @if (vehicles.Any())
                         {
-                            <div class="row g-3">
-                                @foreach (var v in vehicles)
-                                {
-                                    <div class="col-md-6">
-                                        <label class="card p-3 border cursor-pointer h-100 d-flex flex-row align-items-center gap-3">
-                                            <input type="radio" asp-for="VehicleId" value="@v.Id" class="form-check-input mt-0" required />
-                                            <div>
-                                                <div class="fw-bold">@v.Make @v.Model</div>
-                                                <span class="badge bg-secondary font-monospace">@v.RegistrationNumber</span>
-                                                <span class="text-muted small ms-2">@v.CurrentMileage.ToString("N0") KM</span>
-                                            </div>
-                                        </label>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold text-secondary">Choose Vehicle from Fleet / Registered Vehicles</label>
+                                <select asp-for="VehicleId" id="vehicleSelect" class="form-select form-select-lg" required>
+                                    @foreach (var v in vehicles)
+                                    {
+                                        <option value="@v.Id" 
+                                                selected="@(v.Id == Model.VehicleId)"
+                                                data-make="@v.Make" 
+                                                data-model="@v.Model" 
+                                                data-variant="@v.Variant" 
+                                                data-reg="@v.RegistrationNumber" 
+                                                data-year="@v.ManufacturingYear" 
+                                                data-color="@v.Color" 
+                                                data-fuel="@v.FuelType" 
+                                                data-trans="@v.Transmission" 
+                                                data-mileage="@v.CurrentMileage.ToString("N0")"
+                                                data-lastservice="@(v.LastServiceDate?.ToString("yyyy-MM-dd") ?? "Initial Factory")"
+                                                data-targetdue="@v.NextServiceDueMileage.ToString("N0")"
+                                                data-maintdue="@(v.IsMaintenanceDue ? "true" : "false")"
+                                                data-fleet="@v.CompanyFleetName"
+                                                data-owner="@v.CustomerName">
+                                            @v.Make @v.Model (@v.RegistrationNumber) — @v.CurrentMileage.ToString("N0") KM @(v.IsMaintenanceDue ? "⚠️ [Maintenance Due]" : "")
+                                        </option>
+                                    }
+                                </select>
+                            </div>
+
+                            <!-- Selected Vehicle Details Card -->
+                            <div id="vehicleDetailsCard" class="card border border-primary bg-light-subtle p-3 rounded-3 shadow-sm">
+                                <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+                                    <div>
+                                        <h5 class="fw-bold mb-1 text-primary d-flex align-items-center gap-2">
+                                            <i class="bi bi-car-front-fill"></i>
+                                            <span id="detailMakeModel">@(selectedVehicle != null ? $"{selectedVehicle.Make} {selectedVehicle.Model} {selectedVehicle.Variant}" : "")</span>
+                                        </h5>
+                                        <div class="d-flex flex-wrap align-items-center gap-2">
+                                            <span class="badge bg-dark font-monospace fs-6" id="detailReg">@(selectedVehicle?.RegistrationNumber)</span>
+                                            <span class="badge bg-secondary" id="detailFuelTrans">@(selectedVehicle != null ? $"{selectedVehicle.FuelType} • {selectedVehicle.Transmission}" : "")</span>
+                                            <span class="badge bg-info text-dark" id="detailYearColor">@(selectedVehicle != null ? $"{selectedVehicle.ManufacturingYear} • {selectedVehicle.Color}" : "")</span>
+                                        </div>
                                     </div>
-                                }
+                                    <div id="detailMaintenanceAlert" style="display: @(selectedVehicle?.IsMaintenanceDue == true ? "block" : "none");">
+                                        <span class="badge bg-warning text-dark fs-6 px-3 py-2">
+                                            <i class="bi bi-exclamation-triangle-fill me-1"></i> Preventive Maintenance Due
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="row g-2 pt-2 border-top text-muted small">
+                                    <div class="col-6 col-md-3">
+                                        <span class="text-secondary d-block">Current Odometer:</span>
+                                        <strong class="text-dark fs-6" id="detailMileage">@(selectedVehicle != null ? selectedVehicle.CurrentMileage.ToString("N0") + " KM" : "")</strong>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <span class="text-secondary d-block">Next Service Due:</span>
+                                        <strong class="text-dark" id="detailTargetDue">@(selectedVehicle != null ? selectedVehicle.NextServiceDueMileage.ToString("N0") + " KM" : "N/A")</strong>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <span class="text-secondary d-block">Last Serviced:</span>
+                                        <span class="text-dark" id="detailLastService">@(selectedVehicle?.LastServiceDate?.ToString("yyyy-MM-dd") ?? "Initial Factory")</span>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <span class="text-secondary d-block">Assigned To:</span>
+                                        <span class="text-dark fw-semibold" id="detailOwnerFleet">@(selectedVehicle?.CompanyFleetName ?? selectedVehicle?.CustomerName ?? "Personal Vehicle")</span>
+                                    </div>
+                                </div>
                             </div>
                         }
                         else
@@ -156,3 +208,64 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const vehicleSelect = document.getElementById('vehicleSelect');
+            if (!vehicleSelect) return;
+
+            function updateVehicleDetails() {
+                const selectedOpt = vehicleSelect.options[vehicleSelect.selectedIndex];
+                if (!selectedOpt) return;
+
+                const make = selectedOpt.getAttribute('data-make') || '';
+                const model = selectedOpt.getAttribute('data-model') || '';
+                const variant = selectedOpt.getAttribute('data-variant') || '';
+                const reg = selectedOpt.getAttribute('data-reg') || '';
+                const year = selectedOpt.getAttribute('data-year') || '';
+                const color = selectedOpt.getAttribute('data-color') || '';
+                const fuel = selectedOpt.getAttribute('data-fuel') || '';
+                const trans = selectedOpt.getAttribute('data-trans') || '';
+                const mileage = selectedOpt.getAttribute('data-mileage') || '';
+                const lastService = selectedOpt.getAttribute('data-lastservice') || 'Initial Factory';
+                const targetDue = selectedOpt.getAttribute('data-targetdue') || 'N/A';
+                const isMaintDue = selectedOpt.getAttribute('data-maintdue') === 'true';
+                const fleet = selectedOpt.getAttribute('data-fleet') || '';
+                const owner = selectedOpt.getAttribute('data-owner') || '';
+
+                const makeModelEl = document.getElementById('detailMakeModel');
+                if (makeModelEl) makeModelEl.textContent = `${make} ${model} ${variant}`.trim();
+
+                const regEl = document.getElementById('detailReg');
+                if (regEl) regEl.textContent = reg;
+
+                const fuelTransEl = document.getElementById('detailFuelTrans');
+                if (fuelTransEl) fuelTransEl.textContent = `${fuel} • ${trans}`;
+
+                const yearColorEl = document.getElementById('detailYearColor');
+                if (yearColorEl) yearColorEl.textContent = `${year} • ${color}`;
+
+                const mileageEl = document.getElementById('detailMileage');
+                if (mileageEl) mileageEl.textContent = mileage ? `${mileage} KM` : 'N/A';
+
+                const targetDueEl = document.getElementById('detailTargetDue');
+                if (targetDueEl) targetDueEl.textContent = targetDue ? `${targetDue} KM` : 'N/A';
+
+                const lastServiceEl = document.getElementById('detailLastService');
+                if (lastServiceEl) lastServiceEl.textContent = lastService;
+
+                const ownerFleetEl = document.getElementById('detailOwnerFleet');
+                if (ownerFleetEl) ownerFleetEl.textContent = fleet || owner || 'Personal Vehicle';
+
+                const alertEl = document.getElementById('detailMaintenanceAlert');
+                if (alertEl) {
+                    alertEl.style.display = isMaintDue ? 'block' : 'none';
+                }
+            }
+
+            vehicleSelect.addEventListener('change', updateVehicleDetails);
+            updateVehicleDetails();
+        });
+    </script>
+}

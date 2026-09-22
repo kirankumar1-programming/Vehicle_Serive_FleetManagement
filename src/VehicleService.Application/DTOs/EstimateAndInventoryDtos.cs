@@ -1,4 +1,4 @@
-﻿using VehicleService.Domain.Enums;
+using VehicleService.Domain.Enums;
 
 namespace VehicleService.Application.DTOs;
 
@@ -24,6 +24,9 @@ public class RepairEstimateDto
     public DateTime? CustomerRespondedAt { get; set; }
     public string? ClarificationQuestion { get; set; }
     public string? AdvisorReply { get; set; }
+    public AppointmentStatus? JobCardStatus { get; set; }
+    public AppointmentStatus? AppointmentStatus { get; set; }
+    public bool IsCancelled => JobCardStatus == VehicleService.Domain.Enums.AppointmentStatus.Cancelled || AppointmentStatus == VehicleService.Domain.Enums.AppointmentStatus.Cancelled;
     public List<EstimateItemDto> Items { get; set; } = new();
 }
 

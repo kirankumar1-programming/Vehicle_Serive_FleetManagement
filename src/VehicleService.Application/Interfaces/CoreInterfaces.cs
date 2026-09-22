@@ -36,12 +36,14 @@ public interface IJobCardService
     Task<IReadOnlyList<JobCardDto>> GetJobCardsAsync(AppointmentStatus? status = null, int? centerId = null);
     Task<IReadOnlyList<JobCardDto>> GetMechanicJobCardsAsync(string mechanicId);
     Task<JobCardDto?> GetJobCardByIdAsync(int id);
-    Task<JobCardDto> CreateJobCardFromAppointmentAsync(int appointmentId, string advisorId, int? bayId = null);
+    Task<JobCardDto> CreateJobCardFromAppointmentAsync(int appointmentId, string advisorId, int? bayId = null, List<int>? partIdsToReserve = null);
     // Scenario 6: Mechanic Availability Validation
     Task AssignMechanicAsync(int jobCardId, string mechanicId);
     Task UpdateJobCardStatusAsync(int jobCardId, AppointmentStatus newStatus, string? notes = null);
     Task AddWorkLogAsync(int jobCardId, string mechanicId, string taskDesc, decimal hours, string? observations);
     Task RecordReplacedPartAsync(int jobCardId, int partId, int quantity, string loggedByUserId);
+    Task UpdateJobCardDetailsAsync(UpdateJobCardDto dto);
+    Task<bool> CancelJobCardAsync(int jobCardId, string reason, string cancelledByUserId);
 }
 
 public interface IInspectionService
@@ -74,6 +76,7 @@ public interface IInventoryService
     Task<bool> ReleaseReservationAsync(int reservationId);
     Task<bool> ConsumePartAsync(int partId, int quantity, int jobCardId, string performedByUserId);
     Task<bool> AdjustStockAsync(AdjustStockDto dto);
+    Task<int> ReconcileReservedStockAsync();
     Task<IReadOnlyList<InventoryTransaction>> GetTransactionsAsync(int? partId = null);
 }
 

@@ -1,4 +1,4 @@
-﻿namespace VehicleService.Domain.Enums;
+namespace VehicleService.Domain.Enums;
 
 public enum UserRoleType
 {
@@ -75,7 +75,9 @@ public enum InventoryTransactionType
     Return,
     Damage,
     Adjustment,
-    Transfer
+    Transfer,
+    Reservation,
+    ReservationRelease
 }
 
 public enum PaymentStatus

@@ -72,20 +72,36 @@ public class ServiceAdvisorController : Controller
         var mechanics = await _userManager.GetUsersInRoleAsync(UserRoleType.Mechanic.ToString());
         var bays = await _unitOfWork.Repository<ServiceBay>().FindAsync(b => b.ServiceCenterId == appointment.ServiceCenterId && b.IsActive);
 
+        var parts = await _inventoryService.GetAllPartsAsync();
+
         ViewBag.Appointment = appointment;
         ViewBag.Mechanics = mechanics;
         ViewBag.Bays = bays;
+        ViewBag.Parts = parts;
 
         return View();
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CheckInVehicle(int appointmentId, int? bayId, string? mechanicId, int mileage, string fuelLevel, string engineCond, string brakeCond, string tyreCond, string batteryCond, string fluidLevels, string summary, string? damages)
+    public async Task<IActionResult> CheckInVehicle(
+        int appointmentId, 
+        int? bayId, 
+        string? mechanicId, 
+        int mileage, 
+        string fuelLevel, 
+        string engineCond, 
+        string brakeCond, 
+        string tyreCond, 
+        string batteryCond, 
+        string fluidLevels, 
+        string summary, 
+        string? damages,
+        List<int>? reservePartIds = null)
     {
         try
         {
-            var jobCard = await _jobCardService.CreateJobCardFromAppointmentAsync(appointmentId, CurrentUserId, bayId);
+            var jobCard = await _jobCardService.CreateJobCardFromAppointmentAsync(appointmentId, CurrentUserId, bayId, reservePartIds);
 
             var inspection = new VehicleInspection
             {
@@ -128,11 +144,13 @@ public class ServiceAdvisorController : Controller
         var estimate = await _estimateService.GetEstimateByJobCardIdAsync(id);
         var mechanics = await _userManager.GetUsersInRoleAsync(UserRoleType.Mechanic.ToString());
         var parts = await _inventoryService.GetAllPartsAsync();
+        var bays = await _unitOfWork.Repository<ServiceBay>().GetAllAsync();
 
         ViewBag.Inspection = inspection;
         ViewBag.Estimate = estimate;
         ViewBag.Mechanics = mechanics;
         ViewBag.Parts = parts;
+        ViewBag.Bays = bays.Where(b => b.IsActive).ToList();
 
         return View(jobCard);
     }
@@ -192,6 +210,51 @@ public class ServiceAdvisorController : Controller
             TempData["ErrorMessage"] = ex.Message;
         }
         return RedirectToAction(nameof(JobCardDetails), new { id = jobCardId });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateDetails(UpdateJobCardDto dto)
+    {
+        try
+        {
+            await _jobCardService.UpdateJobCardDetailsAsync(dto);
+            TempData["SuccessMessage"] = "Job card details updated successfully!";
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+        return RedirectToAction(nameof(JobCardDetails), new { id = dto.JobCardId });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CancelJobCard(int jobCardId, string reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            TempData["ErrorMessage"] = "Please provide a valid reason for cancellation.";
+            return RedirectToAction(nameof(JobCardDetails), new { id = jobCardId });
+        }
+
+        try
+        {
+            var success = await _jobCardService.CancelJobCardAsync(jobCardId, reason, CurrentUserId);
+            if (success)
+            {
+                TempData["SuccessMessage"] = "Job card cancelled successfully. Reserved parts and bay released.";
+            }
+            else
+            {
+                TempData["ErrorMessage"] = "Failed to cancel job card.";
+            }
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Index));
     }
 }
 
@@ -278,6 +341,65 @@ public class MechanicController : Controller
         }
         return RedirectToAction(nameof(JobDetails), new { id = jobCardId });
     }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateDetails(UpdateJobCardDto dto, string? returnUrl = null)
+    {
+        try
+        {
+            await _jobCardService.UpdateJobCardDetailsAsync(dto);
+            TempData["SuccessMessage"] = "Job card details updated successfully!";
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+
+        if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+        {
+            return Redirect(returnUrl);
+        }
+        return RedirectToAction(nameof(JobDetails), new { id = dto.JobCardId });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CancelJobCard(int jobCardId, string reason, string? returnUrl = null)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            TempData["ErrorMessage"] = "Please provide a valid reason for cancellation.";
+            if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+            {
+                return Redirect(returnUrl);
+            }
+            return RedirectToAction(nameof(JobDetails), new { id = jobCardId });
+        }
+
+        try
+        {
+            var success = await _jobCardService.CancelJobCardAsync(jobCardId, reason, CurrentUserId);
+            if (success)
+            {
+                TempData["SuccessMessage"] = "Job card cancelled successfully. Reserved parts and service bay have been released.";
+            }
+            else
+            {
+                TempData["ErrorMessage"] = "Failed to cancel job card.";
+            }
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+
+        if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+        {
+            return Redirect(returnUrl);
+        }
+        return RedirectToAction(nameof(Index));
+    }
 }
 
 // 3. INVENTORY MANAGER PORTAL
@@ -363,6 +485,29 @@ public class InventoryController : Controller
         catch (Exception ex)
         {
             TempData["ErrorMessage"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReconcileReservedStock()
+    {
+        try
+        {
+            var count = await _inventoryService.ReconcileReservedStockAsync();
+            if (count > 0)
+            {
+                TempData["SuccessMessage"] = $"Successfully reconciled inventory! Updated {count} part(s) with orphaned reservations.";
+            }
+            else
+            {
+                TempData["SuccessMessage"] = "All reserved inventory quantities are fully synchronized with active reservations.";
+            }
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = $"Reconciliation failed: {ex.Message}";
         }
         return RedirectToAction(nameof(Index));
     }

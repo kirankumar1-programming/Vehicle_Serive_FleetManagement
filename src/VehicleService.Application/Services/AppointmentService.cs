@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using VehicleService.Application.DTOs;
 using VehicleService.Application.Interfaces;
 using VehicleService.Domain.Entities;
@@ -275,8 +275,41 @@ public class AppointmentService : IAppointmentService
 
         await _unitOfWork.Repository<ServiceAppointment>().UpdateAsync(appointment);
 
+        // Synchronize and cancel associated JobCard if one exists
+        var jobCard = await _unitOfWork.Repository<ServiceJobCard>().Query()
+            .Include(j => j.RepairEstimates)
+            .FirstOrDefaultAsync(j => j.AppointmentId == appointmentId);
+
+        if (jobCard != null && jobCard.Status != AppointmentStatus.Cancelled && jobCard.Status != AppointmentStatus.Completed)
+        {
+            jobCard.Status = AppointmentStatus.Cancelled;
+            jobCard.ServiceBayId = null;
+            var cancellationNote = $"[Cancelled with Appointment on {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC]: {reason}";
+            jobCard.MechanicNotes = string.IsNullOrWhiteSpace(jobCard.MechanicNotes)
+                ? cancellationNote
+                : $"{jobCard.MechanicNotes}\n{cancellationNote}";
+
+            await _unitOfWork.Repository<ServiceJobCard>().UpdateAsync(jobCard);
+
+            // Reject/cancel any pending estimates on this job card
+            if (jobCard.RepairEstimates != null)
+            {
+                foreach (var est in jobCard.RepairEstimates.Where(e => e.ApprovalStatus == EstimateApprovalStatus.Pending || e.ApprovalStatus == EstimateApprovalStatus.ClarificationRequested))
+                {
+                    est.ApprovalStatus = EstimateApprovalStatus.Rejected;
+                    est.CustomerNotes = $"Auto-rejected due to appointment cancellation: {reason}";
+                    est.CustomerRespondedAt = DateTime.UtcNow;
+                    await _unitOfWork.Repository<RepairEstimate>().UpdateAsync(est);
+                }
+            }
+        }
+
         // 2. Release all Reserved Spare Parts back to available inventory
-        foreach (var reservation in appointment.PartReservations.Where(r => !r.IsReleased && !r.IsConsumed))
+        var reservations = await _unitOfWork.Repository<PartReservation>().Query()
+            .Where(r => r.AppointmentId == appointmentId && !r.IsReleased && !r.IsConsumed)
+            .ToListAsync();
+
+        foreach (var reservation in reservations)
         {
             reservation.IsReleased = true;
             reservation.ReleasedAt = DateTime.UtcNow;
@@ -285,9 +318,23 @@ public class AppointmentService : IAppointmentService
             var part = await _unitOfWork.Repository<InventoryPart>().GetByIdAsync(reservation.InventoryPartId);
             if (part != null)
             {
+                int beforeAvail = part.AvailableQuantity;
                 part.AvailableQuantity += reservation.Quantity;
                 part.ReservedQuantity = Math.Max(0, part.ReservedQuantity - reservation.Quantity);
                 await _unitOfWork.Repository<InventoryPart>().UpdateAsync(part);
+
+                await _unitOfWork.Repository<InventoryTransaction>().AddAsync(new InventoryTransaction
+                {
+                    InventoryPartId = part.Id,
+                    TransactionType = InventoryTransactionType.ReservationRelease,
+                    Quantity = reservation.Quantity,
+                    QuantityBefore = beforeAvail,
+                    QuantityAfter = part.AvailableQuantity,
+                    UnitCost = part.CostPrice,
+                    TotalAmount = part.CostPrice * reservation.Quantity,
+                    ReferenceNumber = appointment.AppointmentNumber,
+                    Notes = $"Released from cancelled Appointment {appointment.AppointmentNumber}"
+                });
             }
         }
 

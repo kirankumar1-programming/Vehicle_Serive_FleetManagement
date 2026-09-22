@@ -1,4 +1,4 @@
-﻿@model JobCardDto
+@model JobCardDto
 @{
     ViewData["Title"] = $"Mechanic Task - {Model.JobCardNumber}";
     var parts = ViewBag.Parts as IReadOnlyList<InventoryPartDto> ?? new List<InventoryPartDto>();
@@ -11,46 +11,69 @@
             <h2 class="fw-bold mb-0 mt-2">@Model.VehicleInfo</h2>
             <p class="text-muted small mb-0">Bay: <strong>@(Model.ServiceBayName ?? "General")</strong> | Odometer: <strong>@Model.OdometerIn.ToString("N0") KM</strong></p>
         </div>
-        <div class="d-flex gap-2">
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#laborModal">
-                <i class="bi bi-clock-history"></i> Log Labor Hours
-            </button>
-            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#partModal">
-                <i class="bi bi-box-seam"></i> Add Replaced Part (Scenario 2)
-            </button>
-        </div>
+        @if (Model.Status != AppointmentStatus.Completed && Model.Status != AppointmentStatus.Cancelled)
+        {
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editJobModal">
+                    <i class="bi bi-pencil-square"></i> Update Job Details
+                </button>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#laborModal">
+                    <i class="bi bi-clock-history"></i> Log Labor Hours
+                </button>
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#partModal">
+                    <i class="bi bi-box-seam"></i> Add Replaced Part
+                </button>
+                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelJobModal">
+                    <i class="bi bi-x-circle"></i> Cancel Job Card
+                </button>
+            </div>
+        }
     </div>
 
-    <!-- Status Progression Controls -->
-    <div class="card p-3 border-0 shadow-sm mb-4 bg-light">
-        <h6 class="fw-bold text-muted small text-uppercase mb-2">Advance Repair Workflow Stage:</h6>
-        <div class="d-flex flex-wrap gap-2">
-            <form asp-action="UpdateStatus" method="post" class="d-inline">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="jobCardId" value="@Model.Id" />
-                <input type="hidden" name="newStatus" value="@AppointmentStatus.InProgress" />
-                <button type="submit" class="btn btn-sm btn-outline-primary @(Model.Status == AppointmentStatus.InProgress ? "active" : "")">
-                    <i class="bi bi-wrench"></i> Start Work (In Progress)
-                </button>
-            </form>
-            <form asp-action="UpdateStatus" method="post" class="d-inline">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="jobCardId" value="@Model.Id" />
-                <input type="hidden" name="newStatus" value="@AppointmentStatus.QualityCheck" />
-                <button type="submit" class="btn btn-sm btn-outline-warning @(Model.Status == AppointmentStatus.QualityCheck ? "active" : "")">
-                    <i class="bi bi-shield-check"></i> Send to Quality Check (QC)
-                </button>
-            </form>
-            <form asp-action="UpdateStatus" method="post" class="d-inline">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="jobCardId" value="@Model.Id" />
-                <input type="hidden" name="newStatus" value="@AppointmentStatus.ReadyForDelivery" />
-                <button type="submit" class="btn btn-sm btn-outline-success @(Model.Status == AppointmentStatus.ReadyForDelivery ? "active" : "")">
-                    <i class="bi bi-car-front"></i> Ready for Delivery
-                </button>
-            </form>
+    @if (Model.Status == AppointmentStatus.Cancelled)
+    {
+        <div class="alert alert-danger d-flex align-items-center mb-4">
+            <i class="bi bi-x-octagon-fill fs-3 me-3"></i>
+            <div>
+                <h5 class="alert-heading fw-bold mb-1">Job Card Cancelled</h5>
+                <p class="mb-0 small">This job card is cancelled. Updating details, logging labor hours, consuming spare parts, and changing workflow stages are disabled.</p>
+            </div>
         </div>
-    </div>
+    }
+
+    <!-- Status Progression Controls -->
+    @if (Model.Status != AppointmentStatus.Completed && Model.Status != AppointmentStatus.Cancelled)
+    {
+        <div class="card p-3 border-0 shadow-sm mb-4 bg-light">
+            <h6 class="fw-bold text-muted small text-uppercase mb-2">Advance Repair Workflow Stage:</h6>
+            <div class="d-flex flex-wrap gap-2">
+                <form asp-action="UpdateStatus" method="post" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="jobCardId" value="@Model.Id" />
+                    <input type="hidden" name="newStatus" value="@AppointmentStatus.InProgress" />
+                    <button type="submit" class="btn btn-sm btn-outline-primary @(Model.Status == AppointmentStatus.InProgress ? "active" : "")">
+                        <i class="bi bi-wrench"></i> Start Work (In Progress)
+                    </button>
+                </form>
+                <form asp-action="UpdateStatus" method="post" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="jobCardId" value="@Model.Id" />
+                    <input type="hidden" name="newStatus" value="@AppointmentStatus.QualityCheck" />
+                    <button type="submit" class="btn btn-sm btn-outline-warning @(Model.Status == AppointmentStatus.QualityCheck ? "active" : "")">
+                        <i class="bi bi-shield-check"></i> Send to Quality Check (QC)
+                    </button>
+                </form>
+                <form asp-action="UpdateStatus" method="post" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="jobCardId" value="@Model.Id" />
+                    <input type="hidden" name="newStatus" value="@AppointmentStatus.ReadyForDelivery" />
+                    <button type="submit" class="btn btn-sm btn-outline-success @(Model.Status == AppointmentStatus.ReadyForDelivery ? "active" : "")">
+                        <i class="bi bi-car-front"></i> Ready for Delivery
+                    </button>
+                </form>
+            </div>
+        </div>
+    }
 
     <div class="row g-4">
         <!-- Replaced Spare Parts -->
@@ -106,6 +129,46 @@
                 {
                     <p class="text-muted small">No labor hours recorded yet.</p>
                 }
+            </div>
+        </div>
+    </div>
+
+    <!-- Job Card Notes, Observations & Findings Card -->
+    <div class="row g-4 mt-1">
+        <div class="col-12">
+            <div class="card p-4 border-0 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-file-text text-primary"></i> Technical Notes & Customer Recommendations</h5>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editJobModal">
+                        <i class="bi bi-pencil-square"></i> Edit Details
+                    </button>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="fw-semibold small text-muted text-uppercase">Mechanic Notes / Repair Findings</label>
+                        <div class="p-3 bg-light rounded small" style="min-height: 80px;">
+                            @(string.IsNullOrWhiteSpace(Model.MechanicNotes) ? "No notes added yet." : Model.MechanicNotes)
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="fw-semibold small text-muted text-uppercase">Quality Check (QC) Notes</label>
+                        <div class="p-3 bg-light rounded small" style="min-height: 80px;">
+                            @(string.IsNullOrWhiteSpace(Model.QualityCheckNotes) ? "Pending QC inspection." : Model.QualityCheckNotes)
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="fw-semibold small text-muted text-uppercase">Advisor Observations</label>
+                        <div class="p-3 bg-light rounded small">
+                            @(string.IsNullOrWhiteSpace(Model.AdvisorObservations) ? "None." : Model.AdvisorObservations)
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="fw-semibold small text-muted text-uppercase">Recommendations for Customer</label>
+                        <div class="p-3 bg-light rounded small">
+                            @(string.IsNullOrWhiteSpace(Model.Recommendations) ? "None." : Model.Recommendations)
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -174,6 +237,85 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-success">Deduct & Record Part</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Job Details Modal -->
+<div class="modal fade" id="editJobModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square"></i> Update Job Card Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="UpdateDetails" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="JobCardId" value="@Model.Id" />
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Status Stage</label>
+                        <select name="Status" class="form-select">
+                            <option value="@AppointmentStatus.VehicleReceived" selected="@(Model.Status == AppointmentStatus.VehicleReceived)">Vehicle Received</option>
+                            <option value="@AppointmentStatus.UnderInspection" selected="@(Model.Status == AppointmentStatus.UnderInspection)">Under Inspection</option>
+                            <option value="@AppointmentStatus.InProgress" selected="@(Model.Status == AppointmentStatus.InProgress)">In Progress</option>
+                            <option value="@AppointmentStatus.QualityCheck" selected="@(Model.Status == AppointmentStatus.QualityCheck)">Quality Check</option>
+                            <option value="@AppointmentStatus.ReadyForDelivery" selected="@(Model.Status == AppointmentStatus.ReadyForDelivery)">Ready For Delivery</option>
+                            <option value="@AppointmentStatus.Completed" selected="@(Model.Status == AppointmentStatus.Completed)">Completed</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Odometer Out (KM)</label>
+                        <input type="number" name="OdometerOut" class="form-control" value="@(Model.OdometerOut ?? Model.OdometerIn)" min="@Model.OdometerIn" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Mechanic Notes / Repair Findings</label>
+                        <textarea name="MechanicNotes" class="form-control" rows="3" placeholder="Describe repair progress or technical diagnosis...">@Model.MechanicNotes</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Quality Check (QC) Notes</label>
+                        <textarea name="QualityCheckNotes" class="form-control" rows="2" placeholder="QC inspection observations...">@Model.QualityCheckNotes</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Recommendations for Customer</label>
+                        <textarea name="Recommendations" class="form-control" rows="2" placeholder="Future service or maintenance suggestions...">@Model.Recommendations</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Cancel Job Card Modal -->
+<div class="modal fade" id="cancelJobModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-octagon"></i> Cancel Job Card @Model.JobCardNumber</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form asp-action="CancelJobCard" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="jobCardId" value="@Model.Id" />
+                <div class="modal-body">
+                    <div class="alert alert-warning small mb-3">
+                        <i class="bi bi-info-circle-fill me-1"></i>
+                        <strong>Automatic Rollback:</strong> Cancelling this job card will automatically release all reserved spare parts back to available stock and free up the service bay.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Reason for Cancellation *</label>
+                        <textarea name="reason" class="form-control" rows="3" placeholder="Please specify why this repair job is being cancelled..." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-danger"><i class="bi bi-x-circle"></i> Confirm Cancellation</button>
                 </div>
             </form>
         </div>

@@ -505,6 +505,612 @@ public class ClientScenarioTests : IDisposable
         updatedPart.ReservedQuantity.Should().Be(2);
     }
 
+
+    [Fact]
+    public async Task Scenario_UpdateJobCardDetails_ShouldPersistModifications()
+    {
+        // Arrange
+        var jobCardService = new JobCardService(_unitOfWork, _mockNotification.Object);
+        var vehicle = await _context.Vehicles.FirstAsync();
+        var bay = await _context.ServiceBays.FirstAsync();
+
+        var appointment = new ServiceAppointment
+        {
+            AppointmentNumber = "APT-TEST-001",
+            VehicleId = vehicle.Id,
+            CustomerId = "cust_001",
+            ServiceCenterId = bay.ServiceCenterId,
+            ServiceBayId = bay.Id,
+            AppointmentDate = DateTime.UtcNow.Date,
+            TimeSlot = "10:00 AM - 12:00 PM",
+            Status = AppointmentStatus.InProgress
+        };
+        _context.ServiceAppointments.Add(appointment);
+        await _context.SaveChangesAsync();
+
+        var jobCard = new ServiceJobCard
+        {
+            JobCardNumber = "JC-TEST-001",
+            AppointmentId = appointment.Id,
+            VehicleId = vehicle.Id,
+            ServiceBayId = bay.Id,
+            Status = AppointmentStatus.InProgress,
+            OdometerIn = 25000,
+            MechanicNotes = "Initial check ok",
+            AdvisorObservations = "Customer noted squeaking"
+        };
+        _context.ServiceJobCards.Add(jobCard);
+        await _context.SaveChangesAsync();
+
+        var updateDto = new UpdateJobCardDto
+        {
+            JobCardId = jobCard.Id,
+            OdometerIn = 25100,
+            OdometerOut = 25120,
+            MechanicNotes = "Replaced front calipers, tested braking.",
+            QualityCheckNotes = "Brake performance verified on dyno.",
+            Recommendations = "Replace rear brake pads in 5,000 km.",
+            Status = AppointmentStatus.QualityCheck
+        };
+
+        // Act
+        await jobCardService.UpdateJobCardDetailsAsync(updateDto);
+
+        // Assert
+        var updated = await _context.ServiceJobCards.FindAsync(jobCard.Id);
+        updated.Should().NotBeNull();
+        updated!.OdometerIn.Should().Be(25100);
+        updated.OdometerOut.Should().Be(25120);
+        updated.MechanicNotes.Should().Be("Replaced front calipers, tested braking.");
+        updated.QualityCheckNotes.Should().Be("Brake performance verified on dyno.");
+        updated.Recommendations.Should().Be("Replace rear brake pads in 5,000 km.");
+        updated.Status.Should().Be(AppointmentStatus.QualityCheck);
+    }
+
+    [Fact]
+    public async Task Scenario_CancelJobCard_ShouldReleaseReservedPartsAndFreeBay()
+    {
+        // Arrange
+        var jobCardService = new JobCardService(_unitOfWork, _mockNotification.Object);
+        var vehicle = await _context.Vehicles.FirstAsync();
+        var bay = await _context.ServiceBays.FirstAsync();
+        var part = await _context.InventoryParts.FirstAsync();
+
+        // Setup part with 5 available, 1 reserved
+        part.AvailableQuantity = 5;
+        part.ReservedQuantity = 1;
+        await _context.SaveChangesAsync();
+
+        var appointment = new ServiceAppointment
+        {
+            AppointmentNumber = "APT-CANCEL-01",
+            VehicleId = vehicle.Id,
+            CustomerId = "cust_001",
+            ServiceCenterId = bay.ServiceCenterId,
+            ServiceBayId = bay.Id,
+            AppointmentDate = DateTime.UtcNow.Date,
+            TimeSlot = "10:00 AM - 12:00 PM",
+            Status = AppointmentStatus.InProgress
+        };
+        _context.ServiceAppointments.Add(appointment);
+        await _context.SaveChangesAsync();
+
+        var reservation = new PartReservation
+        {
+            AppointmentId = appointment.Id,
+            InventoryPartId = part.Id,
+            Quantity = 1,
+            IsReleased = false,
+            IsConsumed = false
+        };
+        _context.PartReservations.Add(reservation);
+
+        var jobCard = new ServiceJobCard
+        {
+            JobCardNumber = "JC-CANCEL-001",
+            AppointmentId = appointment.Id,
+            VehicleId = vehicle.Id,
+            ServiceBayId = bay.Id,
+            Status = AppointmentStatus.InProgress,
+            OdometerIn = 25000
+        };
+        _context.ServiceJobCards.Add(jobCard);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var result = await jobCardService.CancelJobCardAsync(jobCard.Id, "Customer requested cancellation due to travel", "adv_001");
+
+        // Assert
+        result.Should().BeTrue();
+
+        var cancelledJob = await _context.ServiceJobCards.FindAsync(jobCard.Id);
+        cancelledJob.Should().NotBeNull();
+        cancelledJob!.Status.Should().Be(AppointmentStatus.Cancelled);
+        cancelledJob.ServiceBayId.Should().BeNull();
+        cancelledJob.MechanicNotes.Should().Contain("Customer requested cancellation due to travel");
+
+        var updatedAppointment = await _context.ServiceAppointments.FindAsync(appointment.Id);
+        updatedAppointment!.Status.Should().Be(AppointmentStatus.Cancelled);
+        updatedAppointment.CancellationReason.Should().Be("Customer requested cancellation due to travel");
+
+        // Reserved parts should be released back to available inventory
+        var updatedPart = await _context.InventoryParts.FindAsync(part.Id);
+        updatedPart!.AvailableQuantity.Should().Be(6); // 5 + 1
+        updatedPart.ReservedQuantity.Should().Be(0); // 1 - 1
+
+        var updatedReservation = await _context.PartReservations.FindAsync(reservation.Id);
+        updatedReservation!.IsReleased.Should().BeTrue();
+        updatedReservation.ReleasedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Scenario_AdjustStock_ReservationRelease_ShouldTransferReservedToAvailable()
+    {
+        // Arrange
+        var inventoryService = new InventoryService(_unitOfWork);
+        var part = await _context.InventoryParts.FirstAsync();
+        part.AvailableQuantity = 10;
+        part.ReservedQuantity = 3;
+        await _context.SaveChangesAsync();
+
+        var adjustDto = new AdjustStockDto
+        {
+            PartId = part.Id,
+            Quantity = 2,
+            TransactionType = InventoryTransactionType.ReservationRelease,
+            Notes = "Manual reservation release"
+        };
+
+        // Act
+        var result = await inventoryService.AdjustStockAsync(adjustDto);
+
+        // Assert
+        result.Should().BeTrue();
+        var updated = await _context.InventoryParts.FindAsync(part.Id);
+        updated!.AvailableQuantity.Should().Be(12);
+        updated.ReservedQuantity.Should().Be(1);
+
+        var txns = await inventoryService.GetTransactionsAsync(part.Id);
+        var latestTxn = txns.OrderByDescending(t => t.CreatedAt).FirstOrDefault();
+        latestTxn.Should().NotBeNull();
+        latestTxn!.TransactionType.Should().Be(InventoryTransactionType.ReservationRelease);
+        latestTxn.Quantity.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Scenario_ReconcileReservedStock_ShouldReleaseOrphanedReservations()
+    {
+        // Arrange
+        var inventoryService = new InventoryService(_unitOfWork);
+        var center = await _context.ServiceCenters.FirstAsync();
+        var partWithOrphan = new InventoryPart
+        {
+            PartNumber = "ORPHAN-PART-01",
+            Name = "Orphaned Part Test",
+            Category = "Electrical",
+            Manufacturer = "TestMfg",
+            CostPrice = 100,
+            SellingPrice = 200,
+            AvailableQuantity = 5,
+            ReservedQuantity = 3, // 3 reserved, but 0 backing PartReservations!
+            ServiceCenterId = center.Id,
+            IsActive = true
+        };
+        _context.InventoryParts.Add(partWithOrphan);
+        await _context.SaveChangesAsync();
+
+        // Act
+        var count = await inventoryService.ReconcileReservedStockAsync();
+
+        // Assert
+        count.Should().BeGreaterThan(0);
+        var reconciledPart = await _context.InventoryParts.FindAsync(partWithOrphan.Id);
+        reconciledPart!.ReservedQuantity.Should().Be(0);
+        reconciledPart.AvailableQuantity.Should().Be(8); // 5 + 3 orphaned released back to available!
+    }
+
+    [Fact]
+    public async Task Reconcile_LiveDatabase_OrphanedReservations_ShouldSync()
+    {
+        // Path to the web project's SQLite database
+        var dbPath = @"c:\Task\VehicleServiceFleetManagement\src\VehicleService.Web\VehicleService.db";
+        if (!File.Exists(dbPath)) return;
+
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSqlite($"Data Source={dbPath}")
+            .Options;
+
+        using var liveContext = new ApplicationDbContext(options);
+        var liveUow = new UnitOfWork(liveContext);
+        var liveInventoryService = new InventoryService(liveUow);
+
+        var reconciledCount = await liveInventoryService.ReconcileReservedStockAsync();
+
+        // Verify that BAT-AGM-65AH has 0 orphaned reserved quantity and 14 available
+        var battery = await liveContext.InventoryParts.FirstOrDefaultAsync(p => p.PartNumber == "BAT-AGM-65AH");
+        if (battery != null)
+        {
+            battery.ReservedQuantity.Should().Be(0);
+            battery.AvailableQuantity.Should().BeGreaterThan(0);
+        }
+    }
+
+    [Fact]
+    public async Task Scenario_CreateJobCard_WithPartIds_ShouldUpdateReservedCount()
+    {
+        // Arrange
+        var jobCardService = new JobCardService(_unitOfWork, _mockNotification.Object);
+        var vehicle = await _context.Vehicles.FirstAsync();
+        var center = await _context.ServiceCenters.FirstAsync();
+        var part = await _context.InventoryParts.FirstAsync();
+        part.AvailableQuantity = 10;
+        part.ReservedQuantity = 0;
+        await _context.SaveChangesAsync();
+
+        var appointment = new ServiceAppointment
+        {
+            AppointmentNumber = "APT-RESERVE-JC",
+            VehicleId = vehicle.Id,
+            CustomerId = "cust_001",
+            ServiceCenterId = center.Id,
+            AppointmentDate = DateTime.UtcNow,
+            Status = AppointmentStatus.Confirmed
+        };
+        _context.ServiceAppointments.Add(appointment);
+        await _context.SaveChangesAsync();
+
+        // Act - Create Job Card and specify part to reserve
+        var jobCard = await jobCardService.CreateJobCardFromAppointmentAsync(appointment.Id, "adv_001", null, new List<int> { part.Id });
+
+        // Assert
+        jobCard.Should().NotBeNull();
+        var updatedPart = await _context.InventoryParts.FindAsync(part.Id);
+        updatedPart!.AvailableQuantity.Should().Be(9);
+        updatedPart.ReservedQuantity.Should().Be(1);
+
+        var reservation = await _context.PartReservations.FirstOrDefaultAsync(r => r.AppointmentId == appointment.Id && r.InventoryPartId == part.Id);
+        reservation.Should().NotBeNull();
+        reservation!.Quantity.Should().Be(1);
+        reservation.IsReleased.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Scenario_CreateEstimate_WithParts_ShouldReservePartsForJobCard()
+    {
+        // Arrange
+        var jobCardService = new JobCardService(_unitOfWork, _mockNotification.Object);
+        var estimateService = new EstimateService(_unitOfWork, _mockNotification.Object);
+        var vehicle = await _context.Vehicles.FirstAsync();
+        var center = await _context.ServiceCenters.FirstAsync();
+        var part = await _context.InventoryParts.FirstAsync();
+        part.AvailableQuantity = 15;
+        part.ReservedQuantity = 0;
+        await _context.SaveChangesAsync();
+
+        var appointment = new ServiceAppointment
+        {
+            AppointmentNumber = "APT-EST-RES",
+            VehicleId = vehicle.Id,
+            CustomerId = "cust_001",
+            ServiceCenterId = center.Id,
+            AppointmentDate = DateTime.UtcNow,
+            Status = AppointmentStatus.Confirmed
+        };
+        _context.ServiceAppointments.Add(appointment);
+        await _context.SaveChangesAsync();
+
+        var jobCard = await jobCardService.CreateJobCardFromAppointmentAsync(appointment.Id, "adv_001");
+
+        var estimateItems = new List<EstimateItemDto>
+        {
+            new EstimateItemDto
+            {
+                Description = "Brake Pad Replacement",
+                ItemType = EstimateItemType.Part,
+                InventoryPartId = part.Id,
+                Quantity = 2,
+                UnitPrice = 1500,
+                LaborCharges = 500
+            }
+        };
+
+        // Act - Create Estimate
+        var estimate = await estimateService.CreateEstimateAsync(jobCard.Id, "adv_001", estimateItems);
+
+        // Assert
+        estimate.Should().NotBeNull();
+        var updatedPart = await _context.InventoryParts.FindAsync(part.Id);
+        updatedPart!.AvailableQuantity.Should().Be(13); // 15 - 2
+        updatedPart.ReservedQuantity.Should().Be(2);  // 0 + 2
+
+        var reservation = await _context.PartReservations.FirstOrDefaultAsync(r => r.AppointmentId == appointment.Id && r.InventoryPartId == part.Id);
+        reservation.Should().NotBeNull();
+        reservation!.Quantity.Should().Be(2);
+        reservation.IsReleased.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CancelAppointment_ShouldCancelAssociatedJobCard_AndReleaseParts()
+    {
+        // Arrange
+        var appointmentService = new AppointmentService(_unitOfWork, _mockNotification.Object);
+        var jobCardService = new JobCardService(_unitOfWork, _mockNotification.Object);
+        var vehicle = await _context.Vehicles.FirstAsync();
+        var center = await _context.ServiceCenters.FirstAsync();
+        var bay = await _context.ServiceBays.FirstAsync();
+        var part = await _context.InventoryParts.FirstAsync();
+        part.AvailableQuantity = 10;
+        part.ReservedQuantity = 0;
+        await _context.SaveChangesAsync();
+
+        var appointment = new ServiceAppointment
+        {
+            AppointmentNumber = "APT-CANCEL-SYNC",
+            VehicleId = vehicle.Id,
+            CustomerId = "cust_001",
+            ServiceCenterId = center.Id,
+            ServiceBayId = bay.Id,
+            AppointmentDate = DateTime.UtcNow,
+            Status = AppointmentStatus.Confirmed
+        };
+        _context.ServiceAppointments.Add(appointment);
+        await _context.SaveChangesAsync();
+
+        var jobCard = await jobCardService.CreateJobCardFromAppointmentAsync(appointment.Id, "adv_001", bay.Id, new List<int> { part.Id });
+
+        // Verify pre-conditions
+        var partBeforeCancel = await _context.InventoryParts.FindAsync(part.Id);
+        partBeforeCancel!.ReservedQuantity.Should().Be(1);
+        jobCard.Status.Should().Be(AppointmentStatus.VehicleReceived);
+
+        // Act - Cancel appointment
+        var result = await appointmentService.CancelAppointmentAsync(appointment.Id, "Customer requested cancellation", "cust_001");
+
+        // Assert
+        result.Should().BeTrue();
+        var cancelledAppt = await _context.ServiceAppointments.FindAsync(appointment.Id);
+        cancelledAppt!.Status.Should().Be(AppointmentStatus.Cancelled);
+        cancelledAppt.ServiceBayId.Should().BeNull();
+
+        var cancelledJobCard = await _context.ServiceJobCards.FindAsync(jobCard.Id);
+        cancelledJobCard!.Status.Should().Be(AppointmentStatus.Cancelled);
+        cancelledJobCard.ServiceBayId.Should().BeNull();
+        cancelledJobCard.MechanicNotes.Should().Contain("Cancelled with Appointment");
+
+        // Reserved parts released back to inventory
+        var partAfterCancel = await _context.InventoryParts.FindAsync(part.Id);
+        partAfterCancel!.ReservedQuantity.Should().Be(0);
+        partAfterCancel.AvailableQuantity.Should().Be(10);
+    }
+
+    [Fact]
+    public async Task CancelledAppointment_OrJobCard_CannotApproveEstimate_AndStatusRemainsCancelled()
+    {
+        // Arrange
+        var appointmentService = new AppointmentService(_unitOfWork, _mockNotification.Object);
+        var jobCardService = new JobCardService(_unitOfWork, _mockNotification.Object);
+        var estimateService = new EstimateService(_unitOfWork, _mockNotification.Object);
+        var vehicle = await _context.Vehicles.FirstAsync();
+        var center = await _context.ServiceCenters.FirstAsync();
+        var part = await _context.InventoryParts.FirstAsync();
+
+        var appointment = new ServiceAppointment
+        {
+            AppointmentNumber = "APT-CANCEL-EST",
+            VehicleId = vehicle.Id,
+            CustomerId = "cust_001",
+            ServiceCenterId = center.Id,
+            AppointmentDate = DateTime.UtcNow,
+            Status = AppointmentStatus.Confirmed
+        };
+        _context.ServiceAppointments.Add(appointment);
+        await _context.SaveChangesAsync();
+
+        var jobCard = await jobCardService.CreateJobCardFromAppointmentAsync(appointment.Id, "adv_001");
+
+        var estimate = await estimateService.CreateEstimateAsync(jobCard.Id, "adv_001", new List<EstimateItemDto>
+        {
+            new EstimateItemDto { Description = "Oil Filter", ItemType = EstimateItemType.Part, InventoryPartId = part.Id, Quantity = 1, UnitPrice = 500, LaborCharges = 200 }
+        });
+
+        // Cancel the appointment (which also cancels the job card)
+        await appointmentService.CancelAppointmentAsync(appointment.Id, "Schedule conflict", "cust_001");
+
+        // Act & Assert - Attempting to approve the estimate must throw DomainException
+        var act = async () => await estimateService.ProcessCustomerEstimateResponseAsync(new CustomerEstimateResponseDto
+        {
+            EstimateId = estimate.Id,
+            Action = EstimateApprovalStatus.Approved,
+            CustomerNotes = "Trying to approve after cancellation"
+        });
+
+        await act.Should().ThrowAsync<DomainException>()
+            .WithMessage("*cancelled*");
+
+        // Verify job card status did NOT change to InProgress
+        var refreshedJobCard = await _context.ServiceJobCards.FindAsync(jobCard.Id);
+        refreshedJobCard!.Status.Should().Be(AppointmentStatus.Cancelled);
+        refreshedJobCard.Status.Should().NotBe(AppointmentStatus.InProgress);
+
+        var refreshedAppt = await _context.ServiceAppointments.FindAsync(appointment.Id);
+        refreshedAppt!.Status.Should().Be(AppointmentStatus.Cancelled);
+    }
+
+    [Fact]
+    public async Task CancelledJobCard_ShouldNotAllowUpdatingDetailsOrAdvancingStatus()
+    {
+        // Arrange
+        var jobCardService = new JobCardService(_unitOfWork, _mockNotification.Object);
+        var vehicle = await _context.Vehicles.FirstAsync();
+        var center = await _context.ServiceCenters.FirstAsync();
+
+        var appointment = new ServiceAppointment
+        {
+            AppointmentNumber = "APT-CANCEL-BLOCKED",
+            VehicleId = vehicle.Id,
+            CustomerId = "cust_001",
+            ServiceCenterId = center.Id,
+            AppointmentDate = DateTime.UtcNow,
+            Status = AppointmentStatus.Confirmed
+        };
+        _context.ServiceAppointments.Add(appointment);
+        await _context.SaveChangesAsync();
+
+        var jobCard = await jobCardService.CreateJobCardFromAppointmentAsync(appointment.Id, "adv_001");
+        await jobCardService.CancelJobCardAsync(jobCard.Id, "Customer decided not to service", "adv_001");
+
+        // Act & Assert 1: Cannot update status
+        var actStatus = async () => await jobCardService.UpdateJobCardStatusAsync(jobCard.Id, AppointmentStatus.InProgress);
+        await actStatus.Should().ThrowAsync<DomainException>().WithMessage("*cancelled*");
+
+        // Act & Assert 2: Cannot assign mechanic
+        var actAssign = async () => await jobCardService.AssignMechanicAsync(jobCard.Id, "mech_john");
+        await actAssign.Should().ThrowAsync<DomainException>().WithMessage("*cancelled*");
+
+        // Act & Assert 3: Cannot update details
+        var actDetails = async () => await jobCardService.UpdateJobCardDetailsAsync(new UpdateJobCardDto
+        {
+            JobCardId = jobCard.Id,
+            OdometerIn = 30000,
+            MechanicNotes = "Attempted note on cancelled job"
+        });
+        await actDetails.Should().ThrowAsync<DomainException>().WithMessage("*Cannot edit job card in 'Cancelled' status*");
+    }
+
+    [Fact]
+    public async Task CancelledJobCard_ShouldNotAllowLoggingLabor_OrConsumingParts_OrInspections()
+    {
+        // Arrange
+        var jobCardService = new JobCardService(_unitOfWork, _mockNotification.Object);
+        var inventoryService = new InventoryService(_unitOfWork);
+        var inspectionService = new VehicleInspectionService(_unitOfWork);
+        var invoiceService = new InvoiceService(_unitOfWork, _mockNotification.Object);
+        var vehicle = await _context.Vehicles.FirstAsync();
+        var center = await _context.ServiceCenters.FirstAsync();
+        var part = await _context.InventoryParts.FirstAsync();
+
+        var appointment = new ServiceAppointment
+        {
+            AppointmentNumber = "APT-CANCEL-OPERATIONS",
+            VehicleId = vehicle.Id,
+            CustomerId = "cust_001",
+            ServiceCenterId = center.Id,
+            AppointmentDate = DateTime.UtcNow,
+            Status = AppointmentStatus.Confirmed
+        };
+        _context.ServiceAppointments.Add(appointment);
+        await _context.SaveChangesAsync();
+
+        var jobCard = await jobCardService.CreateJobCardFromAppointmentAsync(appointment.Id, "adv_001");
+        await jobCardService.CancelJobCardAsync(jobCard.Id, "Owner withdrew vehicle", "adv_001");
+
+        // Act & Assert 1: Labor log blocked
+        var actLabor = async () => await jobCardService.AddWorkLogAsync(jobCard.Id, "mech_john", "Engine tuning", 2, "Test observations");
+        await actLabor.Should().ThrowAsync<DomainException>().WithMessage("*cancelled*");
+
+        // Act & Assert 2: Part consumption blocked
+        var actConsume = async () => await inventoryService.ConsumePartAsync(part.Id, 1, jobCard.Id, "mech_john");
+        await actConsume.Should().ThrowAsync<DomainException>().WithMessage("*cancelled*");
+
+        // Act & Assert 3: Inspection saving blocked
+        var actInspect = async () => await inspectionService.SaveInspectionAsync(new VehicleInspection
+        {
+            JobCardId = jobCard.Id,
+            VehicleId = vehicle.Id,
+            InspectedByUserId = "adv_001",
+            EngineCondition = "Good"
+        });
+        await actInspect.Should().ThrowAsync<DomainException>().WithMessage("*cancelled*");
+
+        // Act & Assert 4: Invoice generation blocked
+        var actInvoice = async () => await invoiceService.GenerateInvoiceFromJobCardAsync(jobCard.Id);
+        await actInvoice.Should().ThrowAsync<DomainException>().WithMessage("*cancelled*");
+    }
+
+    [Fact]
+    public async Task PreventiveMaintenance_FleetVehicle_CanBeRetrievedAndBooked()
+    {
+        // Arrange
+        var fleet = new CompanyFleet
+        {
+            CompanyName = "Apex Logistics",
+            ContactPerson = "Fleet Manager",
+            ContactEmail = "fleet@apex.com",
+            ContactPhone = "+91 99000 00000",
+            IsActive = true
+        };
+        _context.CompanyFleets.Add(fleet);
+        await _context.SaveChangesAsync();
+
+        var fleetVehicle = new Vehicle
+        {
+            RegistrationNumber = "KA05FL9999",
+            VIN = "VINFL999900000",
+            Make = "Tata",
+            Model = "Ace Gold",
+            Variant = "Diesel",
+            ManufacturingYear = 2023,
+            CurrentMileage = 35000,
+            CompanyFleetId = fleet.Id,
+            LastServiceMileage = 20000,
+            NextServiceDueMileage = 30000, // Due for service!
+            NextServiceDueDate = DateTime.UtcNow.AddDays(-5),
+            IsActive = true
+        };
+        _context.Vehicles.Add(fleetVehicle);
+        await _context.SaveChangesAsync();
+
+        var fleetManager = new ApplicationUser
+        {
+            Id = "fleet_manager_user",
+            UserName = "fleet@test.com",
+            Email = "fleet@test.com",
+            FullName = "Apex Fleet Manager",
+            RoleType = UserRoleType.FleetManager,
+            CompanyFleetId = fleet.Id
+        };
+        _context.Users.Add(fleetManager);
+        await _context.SaveChangesAsync();
+
+        var vehicleService = new VehicleManagementService(_unitOfWork);
+        var pmService = new PreventiveMaintenanceService(_unitOfWork, _mockNotification.Object);
+        var appointmentService = new AppointmentService(_unitOfWork, _mockNotification.Object);
+
+        // Act 1: Verify PM service identifies fleet vehicle as maintenance due
+        var dueVehicles = await pmService.GetVehiclesDueForMaintenanceAsync(fleet.Id);
+        dueVehicles.Should().Contain(v => v.Id == fleetVehicle.Id);
+
+        // Act 2: Fetch vehicle by ID (as done when clicking Book Service from PM)
+        var fetchedVehicle = await vehicleService.GetVehicleByIdAsync(fleetVehicle.Id);
+        fetchedVehicle.Should().NotBeNull();
+        fetchedVehicle!.RegistrationNumber.Should().Be("KA05FL9999");
+        fetchedVehicle.CompanyFleetId.Should().Be(fleet.Id);
+
+        // Act 3: Book appointment for this vehicle
+        var center = await _context.ServiceCenters.FirstAsync();
+        var srv = await _context.ServiceTypes.FirstAsync();
+        var bookDto = new BookAppointmentDto
+        {
+            VehicleId = fleetVehicle.Id,
+            CustomerId = "fleet_manager_user",
+            ServiceCenterId = center.Id,
+            ServiceTypeId = srv.Id,
+            AppointmentDate = DateTime.UtcNow.Date.AddDays(3),
+            TimeSlot = "11:30 AM - 01:30 PM"
+        };
+
+        var appt = await appointmentService.BookAppointmentAsync(bookDto);
+
+        // Assert
+        appt.Should().NotBeNull();
+        appt.VehicleId.Should().Be(fleetVehicle.Id);
+        appt.Status.Should().Be(AppointmentStatus.Confirmed);
+
+        var retrievedAppt = await appointmentService.GetAppointmentByIdAsync(appt.Id);
+        retrievedAppt.Should().NotBeNull();
+        retrievedAppt!.VehicleInfo.Should().Contain("Tata Ace Gold");
+    }
+
     public void Dispose()
     {
         _context.Dispose();

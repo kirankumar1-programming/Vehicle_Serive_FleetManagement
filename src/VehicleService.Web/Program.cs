@@ -8,7 +8,7 @@ using VehicleService.Persistence.Seed;
 var builder = WebApplication.CreateBuilder(args);
 
 // Database Configuration
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=VehicleService.db";
+var connectionString = builder.Configuration.GetConnectionString ("DefaultConnection") ?? "Data Source=VehicleService.db";
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(connectionString));
 

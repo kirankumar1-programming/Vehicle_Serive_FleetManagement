@@ -1,4 +1,4 @@
-﻿@{
+@{
     ViewData["Title"] = "Create Repair Estimate";
     var jobCard = ViewBag.JobCard as JobCardDto;
     var parts = ViewBag.Parts as IReadOnlyList<InventoryPartDto> ?? new List<InventoryPartDto>();
@@ -6,76 +6,702 @@
 
 <div class="container my-4">
     <div class="row justify-content-center">
-        <div class="col-lg-10">
+        <div class="col-lg-11">
             <div class="card p-4 shadow border-0">
-                <div class="d-flex align-items-center gap-3 mb-4">
-                    <div class="stat-icon warning"><i class="bi bi-calculator-fill"></i></div>
-                    <div>
-                        <h3 class="fw-bold mb-0">Prepare Repair & Parts Estimate</h3>
-                        <p class="text-muted small mb-0">Job Card: <strong>@jobCard?.JobCardNumber</strong> | Vehicle: @jobCard?.VehicleInfo</p>
+                <!-- Header -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 pb-3 border-bottom">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="stat-icon warning p-3 rounded-circle bg-warning-subtle text-warning">
+                            <i class="bi bi-calculator-fill fs-3"></i>
+                        </div>
+                        <div>
+                            <h3 class="fw-bold mb-0">Prepare Repair & Parts Estimate</h3>
+                            <p class="text-muted small mb-0">
+                                Job Card: <strong class="text-primary font-monospace">@jobCard?.JobCardNumber</strong> | 
+                                Vehicle: <strong>@jobCard?.VehicleInfo</strong> (@jobCard?.RegistrationNumber)
+                            </p>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-light text-dark border p-2">
+                            <i class="bi bi-person-fill text-muted"></i> Customer: <strong>@jobCard?.CustomerName</strong>
+                        </span>
+                        @if (!string.IsNullOrEmpty(jobCard?.CustomerPhone))
+                        {
+                            <span class="badge bg-light text-dark border p-2">
+                                <i class="bi bi-telephone text-muted"></i> @jobCard?.CustomerPhone
+                            </span>
+                        }
                     </div>
                 </div>
 
-                <form asp-action="CreateEstimate" method="post">
+                @if (!string.IsNullOrWhiteSpace(jobCard?.AdvisorObservations) || !string.IsNullOrWhiteSpace(jobCard?.MechanicNotes))
+                {
+                    <div class="alert alert-secondary bg-light border-0 small mb-4">
+                        @if (!string.IsNullOrWhiteSpace(jobCard?.AdvisorObservations))
+                        {
+                            <div><strong class="text-dark"><i class="bi bi-clipboard-check"></i> Advisor Observations:</strong> @jobCard.AdvisorObservations</div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(jobCard?.MechanicNotes))
+                        {
+                            <div class="mt-1"><strong class="text-dark"><i class="bi bi-tools"></i> Mechanic Notes:</strong> @jobCard.MechanicNotes</div>
+                        }
+                    </div>
+                }
+
+                <form asp-action="CreateEstimate" method="post" id="estimateForm">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="jobCardId" value="@jobCard?.Id" />
 
-                    <div class="table-responsive mb-3">
-                        <table class="table table-bordered align-middle" id="estimateTable">
-                            <thead class="table-light">
+                    <!-- Action Bar for Adding Items -->
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                        <div>
+                            <h5 class="fw-bold mb-0"><i class="bi bi-list-check text-primary"></i> Estimate Line Items</h5>
+                            <small class="text-muted">Add parts from inventory, manual repairs, or service packages</small>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <!-- Button: Add Multiple Parts via Modal -->
+                            <button type="button" class="btn btn-primary btn-sm fw-semibold" data-bs-toggle="modal" data-bs-target="#bulkPartsModal">
+                                <i class="bi bi-boxes"></i> + Add Multiple Parts
+                            </button>
+
+                            <!-- Button: Add Single Row -->
+                            <button type="button" class="btn btn-outline-success btn-sm fw-semibold" id="btnAddRow">
+                                <i class="bi bi-plus-circle"></i> + Add Line Item
+                            </button>
+
+                            <!-- Dropdown: Quick Service Packages -->
+                            <div class="dropdown">
+                                <button class="btn btn-outline-secondary btn-sm dropdown-toggle fw-semibold" type="button" data-bs-toggle="dropdown">
+                                    <i class="bi bi-lightning-charge"></i> Quick Labor Presets
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow">
+                                    <li><h6 class="dropdown-header">Standard Service Packages</h6></li>
+                                    <li><button class="dropdown-item" type="button" onclick="addPresetRow('General Periodic Service Package Labor', 'Labor', null, 1, 0, 1200)">General Periodic Service Labor (₹1,200)</button></li>
+                                    <li><button class="dropdown-item" type="button" onclick="addPresetRow('Brake Overhaul & Cleaning Labor', 'Labor', null, 1, 0, 950)">Brake Overhaul & Cleaning (₹950)</button></li>
+                                    <li><button class="dropdown-item" type="button" onclick="addPresetRow('Engine Oil & Filter Replacement Labor', 'Labor', null, 1, 0, 450)">Oil & Filter Change Labor (₹450)</button></li>
+                                    <li><button class="dropdown-item" type="button" onclick="addPresetRow('Wheel Alignment & 4-Wheel Balancing', 'Labor', null, 1, 0, 850)">Wheel Alignment & Balancing (₹850)</button></li>
+                                    <li><button class="dropdown-item" type="button" onclick="addPresetRow('AC Inspection, Cleaning & Gas Top-up', 'Labor', null, 1, 0, 1100)">AC Service & Gas Top-up (₹1,100)</button></li>
+                                    <li><button class="dropdown-item" type="button" onclick="addPresetRow('Computer Diagnostic OBD2 Scan', 'Labor', null, 1, 0, 650)">Computer Diagnostic Scan (₹650)</button></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Line Items Table -->
+                    <div class="table-responsive mb-3 border rounded shadow-sm">
+                        <table class="table table-hover align-middle mb-0" id="estimateTable">
+                            <thead class="table-light text-secondary small text-uppercase">
                                 <tr>
-                                    <th>Description *</th>
-                                    <th>Type</th>
-                                    <th>Spare Part</th>
-                                    <th style="width: 90px;">Qty</th>
-                                    <th style="width: 140px;">Unit Price (₹)</th>
-                                    <th style="width: 140px;">Labor (₹)</th>
+                                    <th style="width: 40px;" class="text-center">#</th>
+                                    <th style="min-width: 230px;">Description *</th>
+                                    <th style="width: 120px;">Type</th>
+                                    <th style="min-width: 250px;">Spare Part</th>
+                                    <th style="width: 85px;" class="text-center">Qty</th>
+                                    <th style="width: 130px;" class="text-end">Unit Price (₹)</th>
+                                    <th style="width: 130px;" class="text-end">Labor (₹)</th>
+                                    <th style="width: 130px;" class="text-end">Total (₹)</th>
+                                    <th style="width: 50px;" class="text-center"></th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <tr>
-                                    <td><input type="text" name="items[0].Description" class="form-control" value="General Periodic Service Package Labor" required /></td>
+                            <tbody id="estimateBody">
+                                <!-- Default Row 1: General Periodic Service Package Labor -->
+                                <tr class="estimate-row" data-index="0">
+                                    <td class="text-center fw-bold text-muted row-number">1</td>
                                     <td>
-                                        <select name="items[0].ItemType" class="form-select">
-                                            <option value="Labor">Labor</option>
+                                        <input type="hidden" name="items.Index" value="0" />
+                                        <input type="hidden" name="items[0].TaxPercent" value="18" />
+                                        <input type="text" name="items[0].Description" class="form-control form-control-sm item-desc" value="General Periodic Service Package Labor" required />
+                                    </td>
+                                    <td>
+                                        <select name="items[0].ItemType" class="form-select form-select-sm item-type">
+                                            <option value="Labor" selected>Labor</option>
                                             <option value="Part">Part</option>
                                         </select>
                                     </td>
-                                    <td>-</td>
-                                    <td><input type="number" name="items[0].Quantity" class="form-control" value="1" /></td>
-                                    <td><input type="number" name="items[0].UnitPrice" class="form-control" value="0" /></td>
-                                    <td><input type="number" name="items[0].LaborCharges" class="form-control" value="1200" /></td>
+                                    <td>
+                                        <div class="part-select-wrapper" style="display: none;">
+                                            <select name="items[0].InventoryPartId" class="form-select form-select-sm item-part" disabled>
+                                                <option value="">-- Select Spare Part --</option>
+                                                @foreach (var p in parts)
+                                                {
+                                                    <option value="@p.Id" data-price="@p.SellingPrice" data-name="@p.Name" data-sku="@p.PartNumber">
+                                                        @p.Name (@p.PartNumber) - ₹@p.SellingPrice.ToString("N0")
+                                                    </option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <span class="text-muted small fst-italic part-na-label">-</span>
+                                    </td>
+                                    <td>
+                                        <input type="number" name="items[0].Quantity" class="form-control form-control-sm text-center item-qty" value="1" min="1" required />
+                                    </td>
+                                    <td>
+                                        <input type="number" name="items[0].UnitPrice" class="form-control form-control-sm text-end item-unitprice" value="0" min="0" step="0.01" />
+                                    </td>
+                                    <td>
+                                        <input type="number" name="items[0].LaborCharges" class="form-control form-control-sm text-end item-labor" value="1200" min="0" step="0.01" />
+                                    </td>
+                                    <td class="text-end fw-bold font-monospace item-linetotal">₹1,200.00</td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-outline-danger btn-sm p-1 btn-delete-row" title="Remove line item">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
                                 </tr>
-                                <tr>
-                                    <td><input type="text" name="items[1].Description" class="form-control" value="Front Ceramic Brake Pad Set Replacement" required /></td>
+
+                                <!-- Default Row 2: Front Ceramic Brake Pad Set -->
+                                <tr class="estimate-row" data-index="1">
+                                    <td class="text-center fw-bold text-muted row-number">2</td>
                                     <td>
-                                        <select name="items[1].ItemType" class="form-select">
-                                            <option value="Part" selected>Part</option>
+                                        <input type="hidden" name="items.Index" value="1" />
+                                        <input type="hidden" name="items[1].TaxPercent" value="18" />
+                                        <input type="text" name="items[1].Description" class="form-control form-control-sm item-desc" value="Front Ceramic Brake Pad Set Replacement" required />
+                                    </td>
+                                    <td>
+                                        <select name="items[1].ItemType" class="form-select form-select-sm item-type">
                                             <option value="Labor">Labor</option>
+                                            <option value="Part" selected>Part</option>
                                         </select>
                                     </td>
                                     <td>
-                                        <select name="items[1].InventoryPartId" class="form-select">
-                                            @foreach (var p in parts)
-                                            {
-                                                <option value="@p.Id">@p.Name (@p.PartNumber) - ₹@p.SellingPrice.ToString("N0")</option>
-                                            }
-                                        </select>
+                                        <div class="part-select-wrapper">
+                                            <select name="items[1].InventoryPartId" class="form-select form-select-sm item-part">
+                                                <option value="">-- Select Spare Part --</option>
+                                                @foreach (var p in parts)
+                                                {
+                                                    <!option value="@p.Id" data-price="@p.SellingPrice" data-name="@p.Name" data-sku="@p.PartNumber" @(p.PartNumber.Contains("BP") ? "selected" : "")>
+                                                        @p.Name (@p.PartNumber) - ₹@p.SellingPrice.ToString("N0")
+                                                    </!option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <span class="text-muted small fst-italic part-na-label" style="display: none;">-</span>
                                     </td>
-                                    <td><input type="number" name="items[1].Quantity" class="form-control" value="1" /></td>
-                                    <td><input type="number" name="items[1].UnitPrice" class="form-control" value="4500" /></td>
-                                    <td><input type="number" name="items[1].LaborCharges" class="form-control" value="950" /></td>
+                                    <td>
+                                        <input type="number" name="items[1].Quantity" class="form-control form-control-sm text-center item-qty" value="1" min="1" required />
+                                    </td>
+                                    <td>
+                                        <input type="number" name="items[1].UnitPrice" class="form-control form-control-sm text-end item-unitprice" value="4500" min="0" step="0.01" />
+                                    </td>
+                                    <td>
+                                        <input type="number" name="items[1].LaborCharges" class="form-control form-control-sm text-end item-labor" value="950" min="0" step="0.01" />
+                                    </td>
+                                    <td class="text-end fw-bold font-monospace item-linetotal">₹5,450.00</td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-outline-danger btn-sm p-1 btn-delete-row" title="Remove line item">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
 
-                    <div class="d-flex justify-content-end gap-2 pt-3 border-top">
-                        <a asp-action="JobCardDetails" asp-route-id="@jobCard?.Id" class="btn btn-outline-secondary">Cancel</a>
-                        <button type="submit" class="btn btn-warning px-4 fw-semibold"><i class="bi bi-send"></i> Send Estimate to Customer</button>
+                    <!-- Financial Summary & Calculation Box -->
+                    <div class="row justify-content-end mb-4">
+                        <div class="col-md-5 col-lg-4">
+                            <div class="card bg-light border-0 shadow-sm p-3">
+                                <h6 class="fw-bold mb-3 border-bottom pb-2 text-dark">Estimate Cost Breakdown</h6>
+                                <div class="d-flex justify-content-between small mb-1">
+                                    <span class="text-muted">Parts Total:</span>
+                                    <span class="fw-semibold font-monospace" id="summaryParts">₹4,500.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between small mb-1">
+                                    <span class="text-muted">Labor Total:</span>
+                                    <span class="fw-semibold font-monospace" id="summaryLabor">₹2,150.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between small mb-2 border-bottom pb-2">
+                                    <span class="text-muted">GST Tax (18%):</span>
+                                    <span class="fw-semibold font-monospace" id="summaryTax">₹1,197.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between fs-5 fw-bold text-success">
+                                    <span>Grand Total:</span>
+                                    <span class="font-monospace" id="summaryGrandTotal">₹7,847.00</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer Actions -->
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 pt-3 border-top">
+                        <button type="button" class="btn btn-outline-success btn-sm" id="btnAddRowBottom">
+                            <i class="bi bi-plus-circle"></i> + Add Another Item
+                        </button>
+
+                        <div class="d-flex gap-2">
+                            <a asp-action="JobCardDetails" asp-route-id="@jobCard?.Id" class="btn btn-outline-secondary">
+                                <i class="bi bi-x"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-warning px-4 fw-semibold" id="btnSubmitEstimate">
+                                <i class="bi bi-send"></i> Send Estimate to Customer
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Modal: Select Multiple Spare Parts from Inventory -->
+<div class="modal fade" id="bulkPartsModal" tabindex="-1" aria-labelledby="bulkPartsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold" id="bulkPartsModalLabel">
+                    <i class="bi bi-boxes me-2"></i> Select Multiple Spare Parts
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Search & Filters -->
+                <div class="row g-2 mb-3">
+                    <div class="col-md-7">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            <input type="text" id="partFilterInput" class="form-control" placeholder="Search by SKU, Part Name, Category..." />
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <select id="partCategoryFilter" class="form-select">
+                            <option value="">All Categories</option>
+                            <option value="Brakes">Brakes</option>
+                            <option value="Fluids">Fluids & Oils</option>
+                            <option value="Filters">Filters</option>
+                            <option value="Electrical">Electrical & Battery</option>
+                            <option value="Engine">Engine Components</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="small text-muted" id="partMatchCount">Showing @parts.Count spare parts in inventory</span>
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-secondary" id="btnSelectAllParts">Select All Visible</button>
+                        <button type="button" class="btn btn-outline-secondary" id="btnDeselectAllParts">Clear Selection</button>
+                    </div>
+                </div>
+
+                <!-- Parts Table -->
+                <div class="table-responsive border rounded">
+                    <table class="table table-hover align-middle mb-0" id="modalPartsTable">
+                        <thead class="table-light small text-uppercase">
+                            <tr>
+                                <th style="width: 40px;" class="text-center">Select</th>
+                                <th style="width: 110px;">SKU</th>
+                                <th>Part Name & Category</th>
+                                <th style="width: 100px;" class="text-center">Stock</th>
+                                <th style="width: 110px;" class="text-end">Price (₹)</th>
+                                <th style="width: 90px;" class="text-center">Qty</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var p in parts)
+                            {
+                                <tr class="part-select-row" data-category="@p.Category.ToLower()" data-name="@p.Name.ToLower()" data-sku="@p.PartNumber.ToLower()">
+                                    <td class="text-center">
+                                        <input type="checkbox" class="form-check-input part-chk" 
+                                               data-id="@p.Id" 
+                                               data-name="@p.Name" 
+                                               data-sku="@p.PartNumber" 
+                                               data-price="@p.SellingPrice" />
+                                    </td>
+                                    <td class="font-monospace fw-bold text-primary small">@p.PartNumber</td>
+                                    <td>
+                                        <div class="fw-semibold">@p.Name</div>
+                                        <div class="small text-muted">@p.Category | @p.Manufacturer</div>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge @(p.AvailableQuantity > 0 ? "bg-success" : "bg-danger")">
+                                            @p.AvailableQuantity avail
+                                        </span>
+                                    </td>
+                                    <td class="text-end fw-bold font-monospace">₹@p.SellingPrice.ToString("N0")</td>
+                                    <td class="text-center">
+                                        <input type="number" class="form-control form-control-sm text-center part-modal-qty" value="1" min="1" max="@(Math.Max(1, p.AvailableQuantity))" style="width: 70px; margin: 0 auto;" />
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer d-flex justify-content-between">
+                <span class="fw-semibold text-primary" id="selectedCountLabel">0 parts selected</span>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="btnInsertSelectedParts" disabled>
+                        <i class="bi bi-check2-circle"></i> Add Selected Parts to Estimate
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // Cached parts catalog for dynamic row generation
+    const partsCatalog = [
+        @foreach (var p in parts)
+        {
+            @:{ id: @p.Id, sku: "@p.PartNumber", name: "@Html.Raw(p.Name.Replace("\"", "\\\""))", price: @p.SellingPrice, available: @p.AvailableQuantity },
+        }
+    ];
+
+    let nextRowIndex = document.querySelectorAll('#estimateBody tr.estimate-row').length;
+
+    // Generate part options HTML
+    function buildPartOptions(selectedPartId = null) {
+        let opts = '<option value="">-- Select Spare Part --</option>';
+        partsCatalog.forEach(p => {
+            const isSel = (selectedPartId && Number(p.id) === Number(selectedPartId)) ? 'selected' : '';
+            opts += `<option value="${p.id}" data-price="${p.price}" data-name="${p.name}" data-sku="${p.sku}" ${isSel}>${p.name} (${p.sku}) - ₹${Number(p.price).toLocaleString('en-IN')}</option>`;
+        });
+        return opts;
+    }
+
+    // Add a new row to estimate table
+    function addRow(data = {}) {
+        const tbody = document.getElementById('estimateBody');
+        const idx = nextRowIndex++;
+
+        const isPart = (data.itemType === 'Part');
+        const desc = data.description || '';
+        const qty = data.qty || 1;
+        const unitPrice = data.unitPrice !== undefined ? data.unitPrice : 0;
+        const labor = data.labor !== undefined ? data.labor : (isPart ? 0 : 500);
+        const partId = data.partId || null;
+
+        const tr = document.createElement('tr');
+        tr.className = 'estimate-row';
+        tr.setAttribute('data-index', idx);
+
+        tr.innerHTML = `
+            <td class="text-center fw-bold text-muted row-number"></td>
+            <td>
+                <input type="hidden" name="items.Index" value="${idx}" />
+                <input type="hidden" name="items[${idx}].TaxPercent" value="18" />
+                <input type="text" name="items[${idx}].Description" class="form-control form-control-sm item-desc" value="${desc}" placeholder="Item / Service description" required />
+            </td>
+            <td>
+                <select name="items[${idx}].ItemType" class="form-select form-select-sm item-type">
+                    <option value="Labor" ${!isPart ? 'selected' : ''}>Labor</option>
+                    <option value="Part" ${isPart ? 'selected' : ''}>Part</option>
+                </select>
+            </td>
+            <td>
+                <div class="part-select-wrapper" style="${isPart ? '' : 'display: none;'}">
+                    <select name="items[${idx}].InventoryPartId" class="form-select form-select-sm item-part" ${isPart ? '' : 'disabled'}>
+                        ${buildPartOptions(partId)}
+                    </select>
+                </div>
+                <span class="text-muted small fst-italic part-na-label" style="${isPart ? 'display: none;' : ''}">-</span>
+            </td>
+            <td>
+                <input type="number" name="items[${idx}].Quantity" class="form-control form-control-sm text-center item-qty" value="${qty}" min="1" required />
+            </td>
+            <td>
+                <input type="number" name="items[${idx}].UnitPrice" class="form-control form-control-sm text-end item-unitprice" value="${unitPrice}" min="0" step="0.01" />
+            </td>
+            <td>
+                <input type="number" name="items[${idx}].LaborCharges" class="form-control form-control-sm text-end item-labor" value="${labor}" min="0" step="0.01" />
+            </td>
+            <td class="text-end fw-bold font-monospace item-linetotal">₹0.00</td>
+            <td class="text-center">
+                <button type="button" class="btn btn-outline-danger btn-sm p-1 btn-delete-row" title="Remove line item">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        `;
+
+        tbody.appendChild(tr);
+        reindexRows();
+        attachRowEvents(tr);
+        updateLineTotal(tr);
+        updateTotals();
+    }
+
+    // Add preset labor row
+    function addPresetRow(desc, type, partId, qty, unitPrice, labor) {
+        addRow({ description: desc, itemType: type, partId: partId, qty: qty, unitPrice: unitPrice, labor: labor });
+    }
+
+    // Reindex all rows
+    function reindexRows() {
+        const rows = document.querySelectorAll('#estimateBody tr.estimate-row');
+        rows.forEach((row, i) => {
+            row.setAttribute('data-index', i);
+            const numCell = row.querySelector('.row-number');
+            if (numCell) numCell.textContent = (i + 1);
+
+            const indexHidden = row.querySelector('input[name="items.Index"]');
+            if (indexHidden) indexHidden.value = i;
+
+            row.querySelectorAll('input, select').forEach(el => {
+                if (el.name && el.name.startsWith('items[')) {
+                    el.name = el.name.replace(/items\[\d+\]/, `items[${i}]`);
+                }
+            });
+        });
+    }
+
+    // Calculate line total for a single row
+    function updateLineTotal(row) {
+        const qty = parseFloat(row.querySelector('.item-qty')?.value) || 0;
+        const unitPrice = parseFloat(row.querySelector('.item-unitprice')?.value) || 0;
+        const labor = parseFloat(row.querySelector('.item-labor')?.value) || 0;
+        const total = (qty * unitPrice) + labor;
+
+        const totalCell = row.querySelector('.item-linetotal');
+        if (totalCell) {
+            totalCell.textContent = '₹' + total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+    }
+
+    // Update financial summary
+    function updateTotals() {
+        let totalParts = 0;
+        let totalLabor = 0;
+
+        const rows = document.querySelectorAll('#estimateBody tr.estimate-row');
+        rows.forEach(row => {
+            const qty = parseFloat(row.querySelector('.item-qty')?.value) || 0;
+            const unitPrice = parseFloat(row.querySelector('.item-unitprice')?.value) || 0;
+            const labor = parseFloat(row.querySelector('.item-labor')?.value) || 0;
+
+            totalParts += (qty * unitPrice);
+            totalLabor += labor;
+        });
+
+        const subtotal = totalParts + totalLabor;
+        const tax = subtotal * 0.18;
+        const grandTotal = subtotal + tax;
+
+        document.getElementById('summaryParts').textContent = '₹' + totalParts.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('summaryLabor').textContent = '₹' + totalLabor.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('summaryTax').textContent = '₹' + tax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('summaryGrandTotal').textContent = '₹' + grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // Attach event listeners to a row
+    function attachRowEvents(row) {
+        const typeSelect = row.querySelector('.item-type');
+        const partWrapper = row.querySelector('.part-select-wrapper');
+        const partSelect = row.querySelector('.item-part');
+        const partNa = row.querySelector('.part-na-label');
+        const descInput = row.querySelector('.item-desc');
+        const unitPriceInput = row.querySelector('.item-unitprice');
+        const laborInput = row.querySelector('.item-labor');
+        const qtyInput = row.querySelector('.item-qty');
+        const deleteBtn = row.querySelector('.btn-delete-row');
+
+        // Toggle Labor vs Part
+        if (typeSelect) {
+            typeSelect.addEventListener('change', function() {
+                if (this.value === 'Part') {
+                    if (partWrapper) partWrapper.style.display = '';
+                    if (partSelect) partSelect.disabled = false;
+                    if (partNa) partNa.style.display = 'none';
+                    if (partSelect && partSelect.value) {
+                        const opt = partSelect.selectedOptions[0];
+                        if (opt && opt.dataset.price) {
+                            unitPriceInput.value = opt.dataset.price;
+                        }
+                    }
+                } else {
+                    if (partWrapper) partWrapper.style.display = 'none';
+                    if (partSelect) {
+                        partSelect.disabled = true;
+                        partSelect.value = '';
+                    }
+                    if (partNa) partNa.style.display = '';
+                    if (unitPriceInput) unitPriceInput.value = 0;
+                }
+                updateLineTotal(row);
+                updateTotals();
+            });
+        }
+
+        // Part Selection Change
+        if (partSelect) {
+            partSelect.addEventListener('change', function() {
+                const opt = this.selectedOptions[0];
+                if (opt && opt.value) {
+                    if (opt.dataset.name && (!descInput.value || descInput.value.includes("Replacement") || descInput.value === '')) {
+                        descInput.value = opt.dataset.name + " Replacement";
+                    }
+                    if (opt.dataset.price && unitPriceInput) {
+                        unitPriceInput.value = opt.dataset.price;
+                    }
+                }
+                updateLineTotal(row);
+                updateTotals();
+            });
+        }
+
+        // Inputs triggering live calculation
+        [qtyInput, unitPriceInput, laborInput].forEach(inp => {
+            if (inp) {
+                inp.addEventListener('input', function() {
+                    updateLineTotal(row);
+                    updateTotals();
+                });
+            }
+        });
+
+        // Delete Row
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', function() {
+                const allRows = document.querySelectorAll('#estimateBody tr.estimate-row');
+                if (allRows.length <= 1) {
+                    alert('An estimate must have at least one line item.');
+                    return;
+                }
+                row.remove();
+                reindexRows();
+                updateTotals();
+            });
+        }
+    }
+
+    // Attach to existing initial rows
+    document.querySelectorAll('#estimateBody tr.estimate-row').forEach(row => {
+        attachRowEvents(row);
+        updateLineTotal(row);
+    });
+    updateTotals();
+
+    // Add buttons
+    document.getElementById('btnAddRow')?.addEventListener('click', () => addRow());
+    document.getElementById('btnAddRowBottom')?.addEventListener('click', () => addRow());
+
+    // -------------------------------------------------------------
+    // Bulk Parts Selection Modal Logic
+    // -------------------------------------------------------------
+    const partFilterInput = document.getElementById('partFilterInput');
+    const partCategoryFilter = document.getElementById('partCategoryFilter');
+    const modalRows = document.querySelectorAll('.part-select-row');
+    const btnSelectAll = document.getElementById('btnSelectAllParts');
+    const btnDeselectAll = document.getElementById('btnDeselectAllParts');
+    const btnInsertSelected = document.getElementById('btnInsertSelectedParts');
+    const selectedCountLabel = document.getElementById('selectedCountLabel');
+
+    function filterModalParts() {
+        const text = partFilterInput.value.toLowerCase().trim();
+        const cat = partCategoryFilter.value.toLowerCase().trim();
+        let visibleCount = 0;
+
+        modalRows.forEach(r => {
+            const name = r.getAttribute('data-name') || '';
+            const sku = r.getAttribute('data-sku') || '';
+            const category = r.getAttribute('data-category') || '';
+
+            const matchText = !text || name.includes(text) || sku.includes(text);
+            const matchCat = !cat || category.includes(cat);
+
+            if (matchText && matchCat) {
+                r.style.display = '';
+                visibleCount++;
+            } else {
+                r.style.display = 'none';
+            }
+        });
+
+        document.getElementById('partMatchCount').textContent = `Showing ${visibleCount} spare parts`;
+    }
+
+    partFilterInput?.addEventListener('input', filterModalParts);
+    partCategoryFilter?.addEventListener('change', filterModalParts);
+
+    function updateSelectedModalCount() {
+        const checkedBoxes = document.querySelectorAll('.part-chk:checked');
+        const count = checkedBoxes.length;
+        selectedCountLabel.textContent = `${count} part(s) selected`;
+        if (btnInsertSelected) {
+            btnInsertSelected.disabled = (count === 0);
+            btnInsertSelected.innerHTML = `<i class="bi bi-check2-circle"></i> Add Selected (${count}) to Estimate`;
+        }
+    }
+
+    document.querySelectorAll('.part-chk').forEach(chk => {
+        chk.addEventListener('change', updateSelectedModalCount);
+    });
+
+    btnSelectAll?.addEventListener('click', () => {
+        modalRows.forEach(r => {
+            if (r.style.display !== 'none') {
+                const chk = r.querySelector('.part-chk');
+                if (chk) chk.checked = true;
+            }
+        });
+        updateSelectedModalCount();
+    });
+
+    btnDeselectAll?.addEventListener('click', () => {
+        document.querySelectorAll('.part-chk').forEach(chk => chk.checked = false);
+        updateSelectedModalCount();
+    });
+
+    // Insert all selected parts into estimate table
+    btnInsertSelected?.addEventListener('click', () => {
+        const checkedBoxes = document.querySelectorAll('.part-chk:checked');
+        let added = 0;
+
+        checkedBoxes.forEach(chk => {
+            const partId = chk.dataset.id;
+            const name = chk.dataset.name;
+            const price = parseFloat(chk.dataset.price) || 0;
+            const tr = chk.closest('tr');
+            const qtyInp = tr ? tr.querySelector('.part-modal-qty') : null;
+            const qty = qtyInp ? (parseInt(qtyInp.value) || 1) : 1;
+
+            addRow({
+                description: `${name} Replacement`,
+                itemType: 'Part',
+                partId: partId,
+                qty: qty,
+                unitPrice: price,
+                labor: 0
+            });
+            added++;
+            chk.checked = false;
+        });
+
+        updateSelectedModalCount();
+
+        // Close modal
+        const modalEl = document.getElementById('bulkPartsModal');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if (modalInstance) modalInstance.hide();
+    });
+
+    // Form submission validation
+    document.getElementById('estimateForm')?.addEventListener('submit', function(e) {
+        reindexRows();
+        const rows = document.querySelectorAll('#estimateBody tr.estimate-row');
+        if (rows.length === 0) {
+            e.preventDefault();
+            alert('Please add at least one line item to the estimate.');
+            return false;
+        }
+
+        let hasValidItem = false;
+        rows.forEach(r => {
+            const desc = r.querySelector('.item-desc')?.value.trim();
+            const unitPrice = parseFloat(r.querySelector('.item-unitprice')?.value) || 0;
+            const labor = parseFloat(r.querySelector('.item-labor')?.value) || 0;
+            if (desc && (unitPrice > 0 || labor > 0)) {
+                hasValidItem = true;
+            }
+        });
+
+        if (!hasValidItem) {
+            e.preventDefault();
+            alert('Please specify at least one line item with a description and a non-zero price or labor charge.');
+            return false;
+        }
+    });
+</script>
+}

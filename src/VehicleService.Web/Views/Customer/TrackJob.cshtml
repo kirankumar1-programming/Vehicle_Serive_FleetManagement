@@ -1,4 +1,4 @@
-﻿@model JobCardDto
+@model JobCardDto
 @{
     ViewData["Title"] = $"Live Servicing Tracker - {Model.JobCardNumber}";
     var inspection = ViewBag.Inspection as VehicleInspection;
@@ -6,6 +6,7 @@
     var invoice = ViewBag.Invoice as InvoiceDto;
 
     var status = Model.Status;
+    var isCancelled = status == AppointmentStatus.Cancelled;
     int stepIndex = status switch
     {
         AppointmentStatus.Pending or AppointmentStatus.Confirmed => 1,
@@ -15,7 +16,7 @@
         AppointmentStatus.QualityCheck => 5,
         AppointmentStatus.ReadyForDelivery => 6,
         AppointmentStatus.Completed => 7,
-        _ => 1
+        _ => 0
     };
 }
 
@@ -30,39 +31,50 @@
             </div>
             <div class="text-end">
                 <span class="badge-status @Model.Status.ToString().ToLower() fs-6 px-3 py-2">
-                    <i class="bi bi-broadcast"></i> @Model.Status
+                    <i class="bi @(isCancelled ? "bi-x-circle" : "bi-broadcast")"></i> @Model.Status
                 </span>
                 <div class="small text-muted mt-1">Odometer: <strong>@Model.OdometerIn.ToString("N0") KM</strong></div>
             </div>
         </div>
 
+        @if (isCancelled)
+        {
+            <div class="alert alert-danger d-flex align-items-center mt-3 mb-0">
+                <i class="bi bi-x-octagon-fill fs-3 me-3"></i>
+                <div>
+                    <h5 class="alert-heading fw-bold mb-1">Service Job Card Cancelled</h5>
+                    <p class="mb-0 small">This repair job has been cancelled. Any parts reserved for this service have been released back to stock and further servicing is stopped.</p>
+                </div>
+            </div>
+        }
+
         <!-- 7-Stage Visual Timeline Stepper -->
         <div class="timeline-stepper mt-4">
-            <div class="step-item @(stepIndex >= 1 ? "completed" : "") @(stepIndex == 1 ? "active" : "")">
+            <div class="step-item @(!isCancelled && stepIndex >= 1 ? "completed" : "") @(!isCancelled && stepIndex == 1 ? "active" : "")">
                 <div class="step-bubble"><i class="bi bi-calendar-check"></i></div>
                 <div class="step-title">1. Scheduled</div>
             </div>
-            <div class="step-item @(stepIndex >= 2 ? "completed" : "") @(stepIndex == 2 ? "active" : "")">
+            <div class="step-item @(!isCancelled && stepIndex >= 2 ? "completed" : "") @(!isCancelled && stepIndex == 2 ? "active" : "")">
                 <div class="step-bubble"><i class="bi bi-clipboard-check"></i></div>
                 <div class="step-title">2. Inspection</div>
             </div>
-            <div class="step-item @(stepIndex >= 3 ? "completed" : "") @(stepIndex == 3 ? "active" : "")">
+            <div class="step-item @(!isCancelled && stepIndex >= 3 ? "completed" : "") @(!isCancelled && stepIndex == 3 ? "active" : "")">
                 <div class="step-bubble"><i class="bi bi-calculator"></i></div>
                 <div class="step-title">3. Estimate</div>
             </div>
-            <div class="step-item @(stepIndex >= 4 ? "completed" : "") @(stepIndex == 4 ? "active" : "")">
+            <div class="step-item @(!isCancelled && stepIndex >= 4 ? "completed" : "") @(!isCancelled && stepIndex == 4 ? "active" : "")">
                 <div class="step-bubble"><i class="bi bi-wrench"></i></div>
                 <div class="step-title">4. Repairing</div>
             </div>
-            <div class="step-item @(stepIndex >= 5 ? "completed" : "") @(stepIndex == 5 ? "active" : "")">
+            <div class="step-item @(!isCancelled && stepIndex >= 5 ? "completed" : "") @(!isCancelled && stepIndex == 5 ? "active" : "")">
                 <div class="step-bubble"><i class="bi bi-shield-check"></i></div>
                 <div class="step-title">5. Quality Check</div>
             </div>
-            <div class="step-item @(stepIndex >= 6 ? "completed" : "") @(stepIndex == 6 ? "active" : "")">
+            <div class="step-item @(!isCancelled && stepIndex >= 6 ? "completed" : "") @(!isCancelled && stepIndex == 6 ? "active" : "")">
                 <div class="step-bubble"><i class="bi bi-car-front"></i></div>
                 <div class="step-title">6. Ready</div>
             </div>
-            <div class="step-item @(stepIndex >= 7 ? "completed" : "") @(stepIndex == 7 ? "active" : "")">
+            <div class="step-item @(!isCancelled && stepIndex >= 7 ? "completed" : "") @(!isCancelled && stepIndex == 7 ? "active" : "")">
                 <div class="step-bubble"><i class="bi bi-check2-circle"></i></div>
                 <div class="step-title">7. Delivered</div>
             </div>
@@ -70,7 +82,7 @@
     </div>
 
     <!-- Alert / Actionable Cards -->
-    @if (estimate != null && estimate.ApprovalStatus == EstimateApprovalStatus.Pending)
+    @if (!isCancelled && estimate != null && estimate.ApprovalStatus == EstimateApprovalStatus.Pending)
     {
         <div class="alert alert-warning p-3 shadow-sm d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
             <div class="d-flex align-items-center gap-3">

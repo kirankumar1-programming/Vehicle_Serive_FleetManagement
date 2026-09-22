@@ -1,4 +1,4 @@
-﻿@model IReadOnlyList<JobCardDto>
+@model IReadOnlyList<JobCardDto>
 @{
     ViewData["Title"] = "My Assigned Jobs";
 }
@@ -35,13 +35,103 @@
                             <div><i class="bi bi-stopwatch"></i> Labor Logged: <strong>@j.TotalLaborHours hrs</strong></div>
                         </div>
 
-                        <div class="mt-3 pt-2 border-top">
+                        <div class="mt-3 pt-2 border-top d-flex flex-column gap-2">
                             <a asp-action="JobDetails" asp-route-id="@j.Id" class="btn btn-warning w-100 fw-semibold">
                                 <i class="bi bi-tools"></i> Open Digital Checklist &rarr;
                             </a>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-primary flex-fill" data-bs-toggle="modal" data-bs-target="#editModal_@j.Id">
+                                    <i class="bi bi-pencil-square"></i> Update Details
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger flex-fill" data-bs-toggle="modal" data-bs-target="#cancelModal_@j.Id">
+                                    <i class="bi bi-x-circle"></i> Cancel Job
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
+
+                <!-- Edit Job Card Modal -->
+                <div class="modal fade text-start" id="editModal_@j.Id" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content border-0 shadow">
+                            <div class="modal-header bg-primary text-white">
+                                <h5 class="modal-title fw-bold"><i class="bi bi-pencil-square"></i> Update Job Card @j.JobCardNumber</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <form asp-action="UpdateDetails" method="post">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="JobCardId" value="@j.Id" />
+                                <input type="hidden" name="returnUrl" value="/Mechanic" />
+                                <div class="modal-body">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">Status Stage</label>
+                                        <select name="Status" class="form-select">
+                                            <option value="@AppointmentStatus.VehicleReceived" selected="@(j.Status == AppointmentStatus.VehicleReceived)">Vehicle Received</option>
+                                            <option value="@AppointmentStatus.UnderInspection" selected="@(j.Status == AppointmentStatus.UnderInspection)">Under Inspection</option>
+                                            <option value="@AppointmentStatus.InProgress" selected="@(j.Status == AppointmentStatus.InProgress)">In Progress</option>
+                                            <option value="@AppointmentStatus.QualityCheck" selected="@(j.Status == AppointmentStatus.QualityCheck)">Quality Check</option>
+                                            <option value="@AppointmentStatus.ReadyForDelivery" selected="@(j.Status == AppointmentStatus.ReadyForDelivery)">Ready For Delivery</option>
+                                            <option value="@AppointmentStatus.Completed" selected="@(j.Status == AppointmentStatus.Completed)">Completed</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">Odometer Out (KM)</label>
+                                        <input type="number" name="OdometerOut" class="form-control" value="@(j.OdometerOut ?? j.OdometerIn)" min="@j.OdometerIn" />
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">Mechanic Notes / Repair Findings</label>
+                                        <textarea name="MechanicNotes" class="form-control" rows="3" placeholder="Describe work done or diagnosis...">@j.MechanicNotes</textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">Quality Check (QC) Notes</label>
+                                        <textarea name="QualityCheckNotes" class="form-control" rows="2" placeholder="QC inspection observations...">@j.QualityCheckNotes</textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">Recommendations for Customer</label>
+                                        <textarea name="Recommendations" class="form-control" rows="2" placeholder="Future service recommendations...">@j.Recommendations</textarea>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> Save Changes</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cancel Job Card Modal -->
+                <div class="modal fade text-start" id="cancelModal_@j.Id" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content border-0 shadow">
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-octagon"></i> Cancel Job Card @j.JobCardNumber</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <form asp-action="CancelJobCard" method="post">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="jobCardId" value="@j.Id" />
+                                <input type="hidden" name="returnUrl" value="/Mechanic" />
+                                <div class="modal-body">
+                                    <div class="alert alert-warning small mb-3">
+                                        <i class="bi bi-info-circle-fill me-1"></i>
+                                        <strong>Automatic Rollback:</strong> Cancelling this job card will automatically release all reserved spare parts back to available stock and free up <strong>@(j.ServiceBayName ?? "the service bay")</strong>.
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">Reason for Cancellation *</label>
+                                        <textarea name="reason" class="form-control" rows="3" placeholder="e.g. Customer requested cancellation / Critical parts unavailable / Vehicle unfit for repair" required></textarea>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                    <button type="submit" class="btn btn-danger"><i class="bi bi-x-circle"></i> Confirm Cancellation</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
             }
         </div>
     }

@@ -182,6 +182,21 @@ public class InventoryService : IInventoryService
             };
 
             _unitOfWork.Repository<PartReservation>().AddAsync(reservation).GetAwaiter().GetResult();
+
+            var txn = new InventoryTransaction
+            {
+                InventoryPartId = partId,
+                TransactionType = InventoryTransactionType.Reservation,
+                Quantity = quantity,
+                QuantityBefore = part.AvailableQuantity + quantity,
+                QuantityAfter = part.AvailableQuantity,
+                UnitCost = part.CostPrice,
+                TotalAmount = part.CostPrice * quantity,
+                ReferenceNumber = $"APT-{appointmentId}",
+                Notes = $"Stock reserved for Appointment #{appointmentId}"
+            };
+            _unitOfWork.Repository<InventoryTransaction>().AddAsync(txn).GetAwaiter().GetResult();
+
             _unitOfWork.SaveChangesAsync().GetAwaiter().GetResult();
 
             return true;
@@ -223,7 +238,19 @@ public class InventoryService : IInventoryService
             if (part == null) throw new DomainException("Part not found.");
 
             // Check if there was an active reservation for this appointment
-            var jobCard = _unitOfWork.Repository<ServiceJobCard>().Query().FirstOrDefault(j => j.Id == jobCardId);
+            var jobCard = _unitOfWork.Repository<ServiceJobCard>().Query()
+                .Include(j => j.Appointment)
+                .FirstOrDefault(j => j.Id == jobCardId);
+
+            if (jobCard != null && (jobCard.Status == AppointmentStatus.Cancelled || jobCard.Appointment?.Status == AppointmentStatus.Cancelled))
+            {
+                throw new DomainException("Cannot consume parts for a cancelled job card or appointment.");
+            }
+            if (jobCard != null && jobCard.Status == AppointmentStatus.Completed)
+            {
+                throw new DomainException("Cannot consume parts for a completed job card.");
+            }
+
             PartReservation? activeReservation = null;
 
             if (jobCard != null)
@@ -323,6 +350,14 @@ public class InventoryService : IInventoryService
                     part.AvailableQuantity = Math.Max(0, dto.Quantity);
                     after = part.AvailableQuantity;
                     break;
+
+                case InventoryTransactionType.ReservationRelease:
+                    // Release reserved quantity back to available stock
+                    int releaseQty = Math.Min(part.ReservedQuantity, dto.Quantity);
+                    part.ReservedQuantity -= releaseQty;
+                    part.AvailableQuantity += releaseQty;
+                    after = part.AvailableQuantity;
+                    break;
             }
 
             _unitOfWork.Repository<InventoryPart>().UpdateAsync(part).GetAwaiter().GetResult();
@@ -344,6 +379,61 @@ public class InventoryService : IInventoryService
             _unitOfWork.Repository<InventoryTransaction>().AddAsync(txn).GetAwaiter().GetResult();
             _unitOfWork.SaveChangesAsync().GetAwaiter().GetResult();
             return true;
+        }
+    }
+
+    public async Task<int> ReconcileReservedStockAsync()
+    {
+        lock (_stockLock)
+        {
+            var parts = _unitOfWork.Repository<InventoryPart>().Query().ToList();
+            int reconciledCount = 0;
+
+            foreach (var part in parts)
+            {
+                // Find sum of all active, unreleased, unconsumed reservations for this part
+                int activeReservationsSum = _unitOfWork.Repository<PartReservation>().Query()
+                    .Where(r => r.InventoryPartId == part.Id && !r.IsReleased && !r.IsConsumed)
+                    .Sum(r => r.Quantity);
+
+                if (part.ReservedQuantity != activeReservationsSum)
+                {
+                    int beforeAvail = part.AvailableQuantity;
+                    int beforeRes = part.ReservedQuantity;
+
+                    // If reserved was higher than active reservations, release the orphaned difference back to available stock
+                    if (part.ReservedQuantity > activeReservationsSum)
+                    {
+                        int orphanDiff = part.ReservedQuantity - activeReservationsSum;
+                        part.AvailableQuantity += orphanDiff;
+                    }
+                    part.ReservedQuantity = activeReservationsSum;
+
+                    _unitOfWork.Repository<InventoryPart>().UpdateAsync(part).GetAwaiter().GetResult();
+
+                    var txn = new InventoryTransaction
+                    {
+                        InventoryPartId = part.Id,
+                        TransactionType = InventoryTransactionType.ReservationRelease,
+                        Quantity = Math.Abs(beforeRes - activeReservationsSum),
+                        QuantityBefore = beforeAvail,
+                        QuantityAfter = part.AvailableQuantity,
+                        UnitCost = part.CostPrice,
+                        TotalAmount = part.CostPrice * Math.Abs(beforeRes - activeReservationsSum),
+                        ReferenceNumber = "RECONCILE",
+                        Notes = $"Stock reconciliation: Aligned reserved quantity from {beforeRes} to {activeReservationsSum} based on active reservations."
+                    };
+                    _unitOfWork.Repository<InventoryTransaction>().AddAsync(txn).GetAwaiter().GetResult();
+                    reconciledCount++;
+                }
+            }
+
+            if (reconciledCount > 0)
+            {
+                _unitOfWork.SaveChangesAsync().GetAwaiter().GetResult();
+            }
+
+            return reconciledCount;
         }
     }
 
@@ -405,6 +495,19 @@ public class VehicleInspectionService : IInspectionService
 
     public async Task<VehicleInspection> SaveInspectionAsync(VehicleInspection inspection)
     {
+        var jobCard = await _unitOfWork.Repository<ServiceJobCard>().Query()
+            .Include(j => j.Appointment)
+            .FirstOrDefaultAsync(j => j.Id == inspection.JobCardId);
+
+        if (jobCard != null && (jobCard.Status == AppointmentStatus.Cancelled || jobCard.Appointment?.Status == AppointmentStatus.Cancelled))
+        {
+            throw new DomainException("Cannot record or update inspection details for a cancelled job card.");
+        }
+        if (jobCard != null && jobCard.Status == AppointmentStatus.Completed)
+        {
+            throw new DomainException("Cannot modify inspection details for a completed job card.");
+        }
+
         var existing = await _unitOfWork.Repository<VehicleInspection>()
             .FirstOrDefaultAsync(i => i.JobCardId == inspection.JobCardId);
 
@@ -431,7 +534,6 @@ public class VehicleInspectionService : IInspectionService
         }
 
         // Advance JobCard status to UnderInspection / EstimateCreated if needed
-        var jobCard = await _unitOfWork.Repository<ServiceJobCard>().GetByIdAsync(inspection.JobCardId);
         if (jobCard != null && jobCard.Status == AppointmentStatus.VehicleReceived)
         {
             jobCard.Status = AppointmentStatus.UnderInspection;
@@ -444,6 +546,19 @@ public class VehicleInspectionService : IInspectionService
 
     public async Task AddInspectionPhotoAsync(int inspectionId, string photoUrl, string title, string category)
     {
+        var inspection = await _unitOfWork.Repository<VehicleInspection>().Query()
+            .Include(i => i.JobCard).ThenInclude(j => j!.Appointment)
+            .FirstOrDefaultAsync(i => i.Id == inspectionId);
+
+        if (inspection?.JobCard != null && (inspection.JobCard.Status == AppointmentStatus.Cancelled || inspection.JobCard.Appointment?.Status == AppointmentStatus.Cancelled))
+        {
+            throw new DomainException("Cannot add inspection photos for a cancelled job card.");
+        }
+        if (inspection?.JobCard != null && inspection.JobCard.Status == AppointmentStatus.Completed)
+        {
+            throw new DomainException("Cannot add inspection photos for a completed job card.");
+        }
+
         var photo = new InspectionPhoto
         {
             InspectionId = inspectionId,

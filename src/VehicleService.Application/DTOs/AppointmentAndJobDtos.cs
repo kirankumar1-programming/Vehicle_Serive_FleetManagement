@@ -1,4 +1,4 @@
-﻿using VehicleService.Domain.Enums;
+using VehicleService.Domain.Enums;
 
 namespace VehicleService.Application.DTOs;
 
@@ -118,4 +118,25 @@ public class PartConsumptionDto
     public decimal UnitPrice { get; set; }
     public decimal LineTotal { get; set; }
     public DateTime ConsumedAt { get; set; }
+}
+
+public class UpdateJobCardDto
+{
+    public int JobCardId { get; set; }
+    public int? ServiceBayId { get; set; }
+    public string? MechanicId { get; set; }
+    public int OdometerIn { get; set; }
+    public int? OdometerOut { get; set; }
+    public string? AdvisorObservations { get; set; }
+    public string? MechanicNotes { get; set; }
+    public string? QualityCheckNotes { get; set; }
+    public string? Recommendations { get; set; }
+    public AppointmentStatus? Status { get; set; }
+}
+
+public class CancelJobCardDto
+{
+    public int JobCardId { get; set; }
+    public string Reason { get; set; } = string.Empty;
+    public string? CancelledByUserId { get; set; }
 }
