@@ -52,6 +52,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/chatbot.css" asp-append-version="true" />
 </head>
 <body>
     <!-- Quick Demo Role Switcher Toolbar -->
@@ -209,6 +210,12 @@
                                     <li>
                                         <a class="dropdown-item @IsActive("Admin", "Coupons", new[] { "AddCoupon", "EditCoupon" })" asp-controller="Admin" asp-action="Coupons">
                                             <i class="bi bi-tag me-2"></i> Promo Coupons
+                                        </a>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item @IsActive("Chatbot", "KnowledgeBase")" asp-controller="Chatbot" asp-action="KnowledgeBase">
+                                            <i class="bi bi-cpu text-primary me-2"></i> AI Knowledge Base (RAG)
                                         </a>
                                     </li>
                                 </ul>
@@ -372,6 +379,8 @@
                 .then(() => fetchNotifications());
         }
     </script>
+    <partial name="_ChatbotWidget" />
+    <script src="~/js/chatbot.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

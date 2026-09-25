@@ -1111,6 +1111,86 @@ public class ClientScenarioTests : IDisposable
         retrievedAppt!.VehicleInfo.Should().Contain("Tata Ace Gold");
     }
 
+    [Fact]
+    public async Task Scenario8_GenerateInvoiceFromJobCard_CompletedStatus_And_Idempotent()
+    {
+        // Arrange
+        var invoiceService = new InvoiceService(_unitOfWork, _mockNotification.Object);
+
+        var customer = new ApplicationUser
+        {
+            Id = "cust-invoice-test",
+            UserName = "cust@test.com",
+            Email = "cust@test.com",
+            FullName = "Customer Test",
+            RoleType = UserRoleType.Customer
+        };
+        await _context.Users.AddAsync(customer);
+
+        var vehicle = new Vehicle
+        {
+            CustomerId = "cust-invoice-test",
+            Make = "Hyundai",
+            Model = "Creta",
+            ManufacturingYear = 2023,
+            RegistrationNumber = "KA05XY9999",
+            VIN = "VIN-INV-TEST-001"
+        };
+        await _context.Vehicles.AddAsync(vehicle);
+
+        var srvType = new ServiceType
+        {
+            Name = "Periodic Service",
+            BasePrice = 3000m,
+            LaborCharges = 1500m,
+            EstimatedDurationHours = 2.0m
+        };
+        await _context.ServiceTypes.AddAsync(srvType);
+
+        var appt = new ServiceAppointment
+        {
+            AppointmentNumber = "APT-INV-TEST",
+            CustomerId = "cust-invoice-test",
+            Vehicle = vehicle,
+            ServiceType = srvType,
+            AppointmentDate = DateTime.UtcNow,
+            Status = AppointmentStatus.Completed
+        };
+        await _context.ServiceAppointments.AddAsync(appt);
+
+        var jc = new ServiceJobCard
+        {
+            JobCardNumber = "JC-20260924-TEST",
+            Appointment = appt,
+            Vehicle = vehicle,
+            Status = AppointmentStatus.Completed,
+            WorkCompletedAt = DateTime.UtcNow
+        };
+        await _context.ServiceJobCards.AddAsync(jc);
+        await _context.SaveChangesAsync();
+
+        // Act 1: Generate Invoice for a Completed Job Card
+        var inv = await invoiceService.GenerateInvoiceFromJobCardAsync(jc.Id);
+
+        // Assert
+        inv.Should().NotBeNull();
+        inv.JobCardId.Should().Be(jc.Id);
+        inv.CustomerId.Should().Be("cust-invoice-test");
+        inv.Status.Should().Be(PaymentStatus.Pending);
+        inv.GrandTotal.Should().BeGreaterThan(0);
+
+        // Act 2: Idempotent call - calling again must return existing invoice without error
+        var inv2 = await invoiceService.GenerateInvoiceFromJobCardAsync(jc.Id);
+        inv2.Should().NotBeNull();
+        inv2.InvoiceNumber.Should().Be(inv.InvoiceNumber);
+        inv2.Id.Should().Be(inv.Id);
+
+        // Act 3: Query by Job Card ID
+        var retrievedInv = await invoiceService.GetInvoiceByJobCardIdAsync(jc.Id);
+        retrievedInv.Should().NotBeNull();
+        retrievedInv!.InvoiceNumber.Should().Be(inv.InvoiceNumber);
+    }
+
     public void Dispose()
     {
         _context.Dispose();

@@ -1,0 +1,83 @@
+@* AutoPro AI Assistant (RAG Chatbot Floating Widget) *@
+<div id="autopro-chatbot" class="autopro-chatbot-container">
+    <!-- Floating Launcher Trigger Button -->
+    <button id="autopro-chat-launcher" class="autopro-chat-launcher" type="button" title="Chat with AutoBot AI (RAG Assistant)" aria-label="Open AutoBot AI Assistant">
+        <span class="launcher-pulse"></span>
+        <i class="bi bi-robot launcher-icon"></i>
+        <span class="launcher-badge">AI</span>
+    </button>
+
+    <!-- Floating Chat Window -->
+    <div id="autopro-chat-window" class="autopro-chat-window d-none" role="dialog" aria-labelledby="chatBotTitle">
+        <!-- Header -->
+        <div class="chat-header">
+            <div class="d-flex align-items-center gap-2">
+                <div class="chat-avatar">
+                    <i class="bi bi-cpu-fill"></i>
+                    <span class="avatar-online-dot"></span>
+                </div>
+                <div>
+                    <h6 id="chatBotTitle" class="mb-0 fw-bold text-white d-flex align-items-center gap-1">
+                        AutoBot AI
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill text-xs px-2 py-0">RAG Grounded</span>
+                    </h6>
+                    <small class="text-white-50" style="font-size: 0.72rem;">Docs &bull; Live Database &bull; 24/7</small>
+                </div>
+            </div>
+            <div class="chat-header-actions d-flex align-items-center gap-1">
+                <button id="autopro-chat-clear" class="btn-chat-action" type="button" title="Clear Chat History">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </button>
+                <button id="autopro-chat-minimize" class="btn-chat-action" type="button" title="Minimize Chat">
+                    <i class="bi bi-dash-lg"></i>
+                </button>
+                <button id="autopro-chat-close" class="btn-chat-action" type="button" title="Close Chat">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Quick Prompts Bar -->
+        <div id="autopro-chat-prompts" class="chat-prompts-bar">
+            <!-- Dynamically populated via JS -->
+        </div>
+
+        <!-- Messages Body -->
+        <div id="autopro-chat-messages" class="chat-messages-body">
+            <!-- Welcome Bot Message -->
+            <div class="chat-bubble-container bot">
+                <div class="bot-icon-circle"><i class="bi bi-robot"></i></div>
+                <div class="chat-bubble bot">
+                    <div class="bubble-text">
+                        👋 <strong>Welcome to AutoBot!</strong> I am your AI assistant grounded with our <strong>official service manuals</strong>, <strong>warranty guidelines</strong>, <strong>24/7 roadside rescue protocols</strong>, and <strong>live database records</strong>.
+                    </div>
+                    <div class="bubble-meta">
+                        <span class="badge bg-secondary-subtle text-secondary"><i class="bi bi-shield-check"></i> System Initialized</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Typing Indicator -->
+        <div id="autopro-chat-typing" class="chat-typing-indicator d-none">
+            <div class="bot-icon-circle"><i class="bi bi-robot"></i></div>
+            <div class="typing-dots">
+                <span></span><span></span><span></span>
+            </div>
+            <small class="text-muted ms-2" style="font-size: 0.75rem;">AutoBot is searching documents & live DB...</small>
+        </div>
+
+        <!-- Footer Input Area -->
+        <div class="chat-footer">
+            <div class="input-group">
+                <input id="autopro-chat-input" type="text" class="form-control chat-input" placeholder="Ask about vehicles, warranty, roadside, jobs..." maxlength="300" autocomplete="off" />
+                <button id="autopro-chat-mic" class="btn btn-outline-secondary btn-mic" type="button" title="Voice Input (Speech-to-Text)">
+                    <i class="bi bi-mic"></i>
+                </button>
+                <button id="autopro-chat-send" class="btn btn-primary btn-send" type="button" title="Send Message">
+                    <i class="bi bi-send-fill"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

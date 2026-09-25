@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using VehicleService.Domain.Entities;
 
@@ -45,6 +45,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<CustomerComplaint> CustomerComplaints => Set<CustomerComplaint>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<KnowledgeDocument> KnowledgeDocuments => Set<KnowledgeDocument>();
+    public DbSet<DocumentChunk> DocumentChunks => Set<DocumentChunk>();
+    public DbSet<ChatMessageHistory> ChatMessages => Set<ChatMessageHistory>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -130,6 +133,24 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         {
             b.HasIndex(c => c.ClaimNumber).IsUnique();
             b.HasOne(c => c.Warranty).WithMany(w => w.Claims).HasForeignKey(c => c.WarrantyId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Knowledge Documents & Chunks
+        builder.Entity<KnowledgeDocument>(b =>
+        {
+            b.HasIndex(d => d.Category);
+            b.HasMany(d => d.Chunks).WithOne(c => c.KnowledgeDocument).HasForeignKey(c => c.KnowledgeDocumentId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<DocumentChunk>(b =>
+        {
+            b.HasIndex(c => c.KnowledgeDocumentId);
+        });
+
+        builder.Entity<ChatMessageHistory>(b =>
+        {
+            b.HasIndex(m => m.SessionId);
+            b.HasIndex(m => m.Timestamp);
         });
     }
 }

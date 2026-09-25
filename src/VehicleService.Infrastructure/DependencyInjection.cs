@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using VehicleService.Application.Interfaces;
 using VehicleService.Application.Services;
@@ -40,6 +40,14 @@ public static class DependencyInjection
         services.AddScoped<IPaymentService, MockPaymentService>();
         services.AddSingleton<IBlobStorageService, LocalBlobStorageService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
+
+        // AI & RAG Chatbot Services
+        services.Configure<Ai.LlmSettings>(configuration.GetSection(Ai.LlmSettings.SectionName));
+        services.AddHttpClient<Ai.ILlmClient, Ai.LlmClient>();
+        services.AddScoped<IDocumentKnowledgeService, DocumentKnowledgeService>();
+        services.AddScoped<IDatabaseRagService, DatabaseRagService>();
+        services.AddScoped<IRagOrchestratorService, RagOrchestratorService>();
+        services.AddScoped<IChatbotService, RagOrchestratorService>();
 
         // Background Services
         services.AddHostedService<MaintenanceReminderBackgroundService>();

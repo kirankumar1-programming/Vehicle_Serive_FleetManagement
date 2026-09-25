@@ -23,6 +23,56 @@ public static class DbInitializer
                 await context.Database.ExecuteSqlRawAsync("ALTER TABLE Vehicles ADD COLUMN IsActive INTEGER NOT NULL DEFAULT 1;");
             }
             catch { /* Column may already exist */ }
+
+            try
+            {
+                await context.Database.ExecuteSqlRawAsync(@"
+                    CREATE TABLE IF NOT EXISTS KnowledgeDocuments (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        Title TEXT NOT NULL,
+                        Category TEXT NOT NULL,
+                        Description TEXT,
+                        FileName TEXT,
+                        FileType TEXT,
+                        RawContent TEXT,
+                        IsActive INTEGER NOT NULL DEFAULT 1,
+                        ChunkCount INTEGER NOT NULL DEFAULT 0,
+                        IsDeleted INTEGER NOT NULL DEFAULT 0,
+                        CreatedAt TEXT NOT NULL,
+                        UpdatedAt TEXT
+                    );
+                    CREATE TABLE IF NOT EXISTS DocumentChunks (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        KnowledgeDocumentId INTEGER NOT NULL,
+                        ChunkIndex INTEGER NOT NULL,
+                        SectionTitle TEXT,
+                        ChunkText TEXT NOT NULL,
+                        Keywords TEXT,
+                        IsDeleted INTEGER NOT NULL DEFAULT 0,
+                        CreatedAt TEXT NOT NULL,
+                        UpdatedAt TEXT,
+                        FOREIGN KEY(KnowledgeDocumentId) REFERENCES KnowledgeDocuments(Id) ON DELETE CASCADE
+                    );
+                    CREATE TABLE IF NOT EXISTS ChatMessages (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        SessionId TEXT NOT NULL,
+                        UserId TEXT,
+                        UserRole TEXT,
+                        UserMessage TEXT NOT NULL,
+                        BotResponse TEXT NOT NULL,
+                        MatchedSourcesJson TEXT,
+                        Timestamp TEXT NOT NULL,
+                        IsDeleted INTEGER NOT NULL DEFAULT 0,
+                        CreatedAt TEXT NOT NULL,
+                        UpdatedAt TEXT
+                    );");
+            }
+            catch { /* Table may already exist */ }
+
+            // Ensure IsDeleted column exists on existing SQLite databases
+            try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE KnowledgeDocuments ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0;"); } catch { }
+            try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE DocumentChunks ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0;"); } catch { }
+            try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE ChatMessages ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0;"); } catch { }
         }
         else if (context.Database.IsSqlServer())
         {
@@ -38,6 +88,72 @@ public static class DbInitializer
                     END");
             }
             catch { /* Column may already exist */ }
+
+            try
+            {
+                await context.Database.ExecuteSqlRawAsync(@"
+                    IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'KnowledgeDocuments')
+                    BEGIN
+                        CREATE TABLE KnowledgeDocuments (
+                            Id INT IDENTITY(1,1) PRIMARY KEY,
+                            Title NVARCHAR(MAX) NOT NULL,
+                            Category NVARCHAR(100) NOT NULL,
+                            Description NVARCHAR(MAX),
+                            FileName NVARCHAR(255),
+                            FileType NVARCHAR(50),
+                            RawContent NVARCHAR(MAX),
+                            IsActive BIT NOT NULL DEFAULT 1,
+                            ChunkCount INT NOT NULL DEFAULT 0,
+                            IsDeleted BIT NOT NULL DEFAULT 0,
+                            CreatedAt DATETIME2 NOT NULL,
+                            UpdatedAt DATETIME2
+                        );
+                    END
+                    IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'DocumentChunks')
+                    BEGIN
+                        CREATE TABLE DocumentChunks (
+                            Id INT IDENTITY(1,1) PRIMARY KEY,
+                            KnowledgeDocumentId INT NOT NULL,
+                            ChunkIndex INT NOT NULL,
+                            SectionTitle NVARCHAR(255),
+                            ChunkText NVARCHAR(MAX) NOT NULL,
+                            Keywords NVARCHAR(MAX),
+                            IsDeleted BIT NOT NULL DEFAULT 0,
+                            CreatedAt DATETIME2 NOT NULL,
+                            UpdatedAt DATETIME2,
+                            CONSTRAINT FK_DocumentChunks_KnowledgeDocuments FOREIGN KEY(KnowledgeDocumentId) REFERENCES KnowledgeDocuments(Id) ON DELETE CASCADE
+                        );
+                    END
+                    IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ChatMessages')
+                    BEGIN
+                        CREATE TABLE ChatMessages (
+                            Id INT IDENTITY(1,1) PRIMARY KEY,
+                            SessionId NVARCHAR(100) NOT NULL,
+                            UserId NVARCHAR(450),
+                            UserRole NVARCHAR(100),
+                            UserMessage NVARCHAR(MAX) NOT NULL,
+                            BotResponse NVARCHAR(MAX) NOT NULL,
+                            MatchedSourcesJson NVARCHAR(MAX),
+                            Timestamp DATETIME2 NOT NULL,
+                            IsDeleted BIT NOT NULL DEFAULT 0,
+                            CreatedAt DATETIME2 NOT NULL,
+                            UpdatedAt DATETIME2
+                        );
+                    END
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('KnowledgeDocuments') AND name = 'IsDeleted')
+                    BEGIN
+                        ALTER TABLE KnowledgeDocuments ADD IsDeleted bit NOT NULL CONSTRAINT DF_KnowledgeDocuments_IsDeleted DEFAULT 0;
+                    END
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('DocumentChunks') AND name = 'IsDeleted')
+                    BEGIN
+                        ALTER TABLE DocumentChunks ADD IsDeleted bit NOT NULL CONSTRAINT DF_DocumentChunks_IsDeleted DEFAULT 0;
+                    END
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ChatMessages') AND name = 'IsDeleted')
+                    BEGIN
+                        ALTER TABLE ChatMessages ADD IsDeleted bit NOT NULL CONSTRAINT DF_ChatMessages_IsDeleted DEFAULT 0;
+                    END");
+            }
+            catch { /* Tables may already exist */ }
         }
 
         // 1. Seed Roles
@@ -639,5 +755,8 @@ public static class DbInitializer
 
             await context.SaveChangesAsync();
         }
+
+        // 12. Seed Document Knowledge Base for RAG Chatbot
+        await DocumentKnowledgeSeeder.SeedAsync(context);
     }
 }

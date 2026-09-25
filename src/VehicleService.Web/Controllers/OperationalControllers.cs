@@ -20,6 +20,7 @@ public class ServiceAdvisorController : Controller
     private readonly IInspectionService _inspectionService;
     private readonly IEstimateService _estimateService;
     private readonly IInventoryService _inventoryService;
+    private readonly IInvoiceService _invoiceService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly UserManager<ApplicationUser> _userManager;
 
@@ -29,6 +30,7 @@ public class ServiceAdvisorController : Controller
         IInspectionService inspectionService,
         IEstimateService estimateService,
         IInventoryService inventoryService,
+        IInvoiceService invoiceService,
         IUnitOfWork unitOfWork,
         UserManager<ApplicationUser> userManager)
     {
@@ -37,6 +39,7 @@ public class ServiceAdvisorController : Controller
         _inspectionService = inspectionService;
         _estimateService = estimateService;
         _inventoryService = inventoryService;
+        _invoiceService = invoiceService;
         _unitOfWork = unitOfWork;
         _userManager = userManager;
     }
@@ -142,17 +145,36 @@ public class ServiceAdvisorController : Controller
 
         var inspection = await _inspectionService.GetInspectionByJobCardIdAsync(id);
         var estimate = await _estimateService.GetEstimateByJobCardIdAsync(id);
+        var invoice = await _invoiceService.GetInvoiceByJobCardIdAsync(id);
         var mechanics = await _userManager.GetUsersInRoleAsync(UserRoleType.Mechanic.ToString());
         var parts = await _inventoryService.GetAllPartsAsync();
         var bays = await _unitOfWork.Repository<ServiceBay>().GetAllAsync();
 
         ViewBag.Inspection = inspection;
         ViewBag.Estimate = estimate;
+        ViewBag.Invoice = invoice;
         ViewBag.Mechanics = mechanics;
         ViewBag.Parts = parts;
         ViewBag.Bays = bays.Where(b => b.IsActive).ToList();
 
         return View(jobCard);
+    }
+
+    [AcceptVerbs("GET", "POST")]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> GenerateInvoice(int jobCardId)
+    {
+        try
+        {
+            var inv = await _invoiceService.GenerateInvoiceFromJobCardAsync(jobCardId);
+            TempData["SuccessMessage"] = $"Invoice {inv.InvoiceNumber} generated successfully!";
+            return RedirectToAction("InvoiceDetails", "Finance", new { id = inv.Id });
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+            return RedirectToAction(nameof(JobCardDetails), new { id = jobCardId });
+        }
     }
 
     [HttpGet]
@@ -616,9 +638,15 @@ public class FinanceController : Controller
     {
         var invoices = await _invoiceService.GetInvoicesAsync(status: status);
         var report = await _reportService.GetRevenueReportAsync();
+        var allJobCards = await _jobCardService.GetJobCardsAsync();
+        var invoicedJobCardIds = invoices.Select(i => i.JobCardId).ToHashSet();
+        var pendingJobCards = allJobCards
+            .Where(j => j.Status != AppointmentStatus.Cancelled && !invoicedJobCardIds.Contains(j.Id))
+            .ToList();
 
         ViewBag.RevenueReport = report;
         ViewBag.SelectedStatus = status;
+        ViewBag.PendingJobCards = pendingJobCards;
 
         return View(invoices);
     }
@@ -630,8 +658,8 @@ public class FinanceController : Controller
         return View(inv);
     }
 
-    [HttpPost]
-    [ValidateAntiForgeryToken]
+    [AcceptVerbs("GET", "POST")]
+    [IgnoreAntiforgeryToken]
     public async Task<IActionResult> GenerateInvoice(int jobCardId)
     {
         try
@@ -643,7 +671,7 @@ public class FinanceController : Controller
         catch (Exception ex)
         {
             TempData["ErrorMessage"] = ex.Message;
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction("JobCardDetails", "ServiceAdvisor", new { id = jobCardId });
         }
     }
 

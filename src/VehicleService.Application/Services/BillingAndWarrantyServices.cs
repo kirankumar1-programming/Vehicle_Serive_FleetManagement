@@ -86,6 +86,7 @@ public class InvoiceService : IInvoiceService
             .Include(j => j.Appointment).ThenInclude(a => a!.ServicePackage)
             .Include(j => j.Appointment).ThenInclude(a => a!.Customer)
             .Include(j => j.Vehicle).ThenInclude(v => v!.CompanyFleet)
+            .Include(j => j.Vehicle).ThenInclude(v => v!.Customer)
             .Include(j => j.RepairEstimates).ThenInclude(e => e.Items)
             .Include(j => j.PartsConsumed).ThenInclude(p => p.InventoryPart)
             .FirstOrDefaultAsync(j => j.Id == jobCardId);
@@ -167,6 +168,23 @@ public class InvoiceService : IInvoiceService
             }
         }
 
+        // If no estimate items, check if parts were consumed during service
+        if (invoiceItems.Count == 0 && jobCard.PartsConsumed.Any())
+        {
+            foreach (var part in jobCard.PartsConsumed)
+            {
+                partsTotal += part.LineTotal;
+                invoiceItems.Add(new InvoiceItem
+                {
+                    Description = $"{part.InventoryPart?.Name ?? "Part"} ({part.InventoryPart?.PartNumber})",
+                    Category = "Part",
+                    Quantity = part.Quantity,
+                    UnitPrice = part.UnitPrice,
+                    LineTotal = part.LineTotal
+                });
+            }
+        }
+
         decimal subTotal = servicesTotal + partsTotal + laborTotal;
 
         // 3. Corporate Fleet or Customer Discount
@@ -181,11 +199,15 @@ public class InvoiceService : IInvoiceService
         decimal tax = taxable * 0.18m; // Standard 18% GST/VAT
         decimal grandTotal = taxable + tax;
 
+        string customerId = !string.IsNullOrEmpty(jobCard.Appointment?.CustomerId)
+            ? jobCard.Appointment.CustomerId
+            : (jobCard.Vehicle?.CustomerId ?? string.Empty);
+
         var invoice = new Invoice
         {
             InvoiceNumber = invoiceNumber,
             JobCardId = jobCardId,
-            CustomerId = jobCard.Appointment?.CustomerId ?? string.Empty,
+            CustomerId = customerId,
             VehicleId = jobCard.VehicleId,
             IssueDate = DateTime.UtcNow,
             DueDate = DateTime.UtcNow.AddDays(7),

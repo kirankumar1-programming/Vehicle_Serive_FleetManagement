@@ -3,9 +3,11 @@
     ViewData["Title"] = $"Job Card - {Model.JobCardNumber}";
     var inspection = ViewBag.Inspection as VehicleInspection;
     var estimate = ViewBag.Estimate as RepairEstimateDto;
+    var invoice = ViewBag.Invoice as InvoiceDto;
     var mechanics = ViewBag.Mechanics as IList<ApplicationUser> ?? new List<ApplicationUser>();
     var parts = ViewBag.Parts as IReadOnlyList<InventoryPartDto> ?? new List<InventoryPartDto>();
     var bays = ViewBag.Bays as IList<ServiceBay> ?? new List<ServiceBay>();
+    int? effectiveInvoiceId = Model.InvoiceId ?? invoice?.Id;
 }
 
 <div class="container-fluid px-lg-4 my-4">
@@ -15,24 +17,45 @@
             <h2 class="fw-bold mb-0 mt-2">@Model.VehicleInfo</h2>
             <p class="text-muted small mb-0">Customer: <strong>@Model.CustomerName</strong> (@Model.CustomerPhone) | Odometer In: <strong>@Model.OdometerIn.ToString("N0") KM</strong> @(Model.OdometerOut.HasValue ? $"| Out: {Model.OdometerOut.Value:N0} KM" : "")</p>
         </div>
-        @if (Model.Status != AppointmentStatus.Completed && Model.Status != AppointmentStatus.Cancelled)
+        @if (Model.Status != AppointmentStatus.Cancelled)
         {
             <div class="d-flex gap-2 flex-wrap">
-                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editAdvisorJobModal">
-                    <i class="bi bi-pencil-square"></i> Edit Details
-                </button>
-                @if (estimate == null)
+                @if (Model.Status != AppointmentStatus.Completed)
                 {
-                    <a asp-action="CreateEstimate" asp-route-jobCardId="@Model.Id" class="btn btn-warning fw-semibold">
-                        <i class="bi bi-calculator"></i> Prepare Repair Estimate
+                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editAdvisorJobModal">
+                        <i class="bi bi-pencil-square"></i> Edit Details
+                    </button>
+                    @if (estimate == null)
+                    {
+                        <a asp-action="CreateEstimate" asp-route-jobCardId="@Model.Id" class="btn btn-warning fw-semibold">
+                            <i class="bi bi-calculator"></i> Prepare Repair Estimate
+                        </a>
+                    }
+                }
+
+                @if (effectiveInvoiceId.HasValue)
+                {
+                    <a asp-controller="Finance" asp-action="InvoiceDetails" asp-route-id="@effectiveInvoiceId.Value" class="btn btn-success fw-semibold">
+                        <i class="bi bi-receipt"></i> View Invoice
                     </a>
                 }
-                <a asp-controller="Finance" asp-action="GenerateInvoice" asp-route-jobCardId="@Model.Id" class="btn btn-outline-primary">
-                    <i class="bi bi-receipt"></i> Generate Invoice
-                </a>
-                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelAdvisorJobModal">
-                    <i class="bi bi-x-circle"></i> Cancel Job Card
-                </button>
+                else
+                {
+                    <form asp-controller="Finance" asp-action="GenerateInvoice" method="post" class="d-inline">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="jobCardId" value="@Model.Id" />
+                        <button type="submit" class="btn btn-primary fw-semibold">
+                            <i class="bi bi-receipt"></i> Generate Invoice
+                        </button>
+                    </form>
+                }
+
+                @if (Model.Status != AppointmentStatus.Completed)
+                {
+                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancelAdvisorJobModal">
+                        <i class="bi bi-x-circle"></i> Cancel Job Card
+                    </button>
+                }
             </div>
         }
     </div>
@@ -87,7 +110,7 @@
             <!-- Estimate Status Card -->
             @if (estimate != null)
             {
-                <div class="card p-4 border-0 shadow-sm">
+                <div class="card p-4 border-0 shadow-sm mb-4">
                     <h5 class="fw-bold mb-2"><i class="bi bi-calculator text-warning"></i> Estimate @estimate.EstimateNumber</h5>
                     <div class="fs-4 fw-bold text-primary mb-2">₹@estimate.GrandTotal.ToString("N2")</div>
                     <span class="badge @(estimate.ApprovalStatus == EstimateApprovalStatus.Approved ? "bg-success" : "bg-warning text-dark") fs-6 mb-2">
@@ -96,6 +119,44 @@
                     <p class="small text-muted mb-0">Customer Response: <em>@(estimate.CustomerNotes ?? "Pending")</em></p>
                 </div>
             }
+
+            <!-- Invoice Status Card -->
+            <div class="card p-4 border-0 shadow-sm mb-4">
+                <h5 class="fw-bold mb-2"><i class="bi bi-receipt text-success"></i> Billing & Invoice</h5>
+                @if (invoice != null || effectiveInvoiceId.HasValue)
+                {
+                    var invTotal = invoice?.GrandTotal ?? 0;
+                    var invNum = invoice?.InvoiceNumber ?? $"INV #{effectiveInvoiceId}";
+                    var invStatus = invoice?.Status ?? Model.PaymentStatus ?? PaymentStatus.Pending;
+
+                    @if (invoice != null)
+                    {
+                        <div class="fs-4 fw-bold text-success mb-1">₹@invTotal.ToString("N2")</div>
+                    }
+                    <div class="small font-monospace text-muted mb-2">@invNum</div>
+                    <span class="badge @(invStatus == PaymentStatus.Successful ? "bg-success" : "bg-warning text-dark") fs-6 mb-3">
+                        Payment: @invStatus
+                    </span>
+                    <a asp-controller="Finance" asp-action="InvoiceDetails" asp-route-id="@effectiveInvoiceId!.Value" class="btn btn-outline-primary btn-sm w-100">
+                        <i class="bi bi-eye"></i> View Full Invoice
+                    </a>
+                }
+                else if (Model.Status != AppointmentStatus.Cancelled)
+                {
+                    <p class="small text-muted mb-3">No invoice generated yet for this job card.</p>
+                    <form asp-controller="Finance" asp-action="GenerateInvoice" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="jobCardId" value="@Model.Id" />
+                        <button type="submit" class="btn btn-primary btn-sm w-100 fw-semibold">
+                            <i class="bi bi-receipt"></i> Generate Invoice Now
+                        </button>
+                    </form>
+                }
+                else
+                {
+                    <p class="small text-muted mb-0">Job card is cancelled. Invoicing unavailable.</p>
+                }
+            </div>
         </div>
 
         <!-- Inspection & Work History -->
