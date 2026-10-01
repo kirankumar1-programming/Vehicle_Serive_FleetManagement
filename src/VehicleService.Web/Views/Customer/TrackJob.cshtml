@@ -30,8 +30,9 @@
                 <p class="text-muted small mb-0">Service Advisor: <strong>@(Model.ServiceAdvisorName ?? "Vikram Malhotra")</strong> | Lead Mechanic: <strong>@(Model.MechanicName ?? "Workshop Assigned")</strong></p>
             </div>
             <div class="text-end">
-                <span class="badge-status @Model.Status.ToString().ToLower() fs-6 px-3 py-2">
-                    <i class="bi @(isCancelled ? "bi-x-circle" : "bi-broadcast")"></i> @Model.Status
+                <span class="badge-status @(status == AppointmentStatus.Completed ? "delivered" : status.ToString().ToLower()) fs-6 px-3 py-2">
+                    <i class="bi @(isCancelled ? "bi-x-circle" : (status == AppointmentStatus.Completed ? "bi-check-circle-fill" : "bi-broadcast"))"></i>
+                    @(status == AppointmentStatus.Completed ? "Delivered" : status.ToString())
                 </span>
                 <div class="small text-muted mt-1">Odometer: <strong>@Model.OdometerIn.ToString("N0") KM</strong></div>
             </div>
@@ -50,31 +51,31 @@
 
         <!-- 7-Stage Visual Timeline Stepper -->
         <div class="timeline-stepper mt-4">
-            <div class="step-item @(!isCancelled && stepIndex >= 1 ? "completed" : "") @(!isCancelled && stepIndex == 1 ? "active" : "")">
+            <div class="step-item @(!isCancelled && stepIndex >= 1 ? "completed" : "") @(!isCancelled && stepIndex == 1 && stepIndex < 7 ? "active" : "")">
                 <div class="step-bubble"><i class="bi bi-calendar-check"></i></div>
                 <div class="step-title">1. Scheduled</div>
             </div>
-            <div class="step-item @(!isCancelled && stepIndex >= 2 ? "completed" : "") @(!isCancelled && stepIndex == 2 ? "active" : "")">
+            <div class="step-item @(!isCancelled && stepIndex >= 2 ? "completed" : "") @(!isCancelled && stepIndex == 2 && stepIndex < 7 ? "active" : "")">
                 <div class="step-bubble"><i class="bi bi-clipboard-check"></i></div>
                 <div class="step-title">2. Inspection</div>
             </div>
-            <div class="step-item @(!isCancelled && stepIndex >= 3 ? "completed" : "") @(!isCancelled && stepIndex == 3 ? "active" : "")">
+            <div class="step-item @(!isCancelled && stepIndex >= 3 ? "completed" : "") @(!isCancelled && stepIndex == 3 && stepIndex < 7 ? "active" : "")">
                 <div class="step-bubble"><i class="bi bi-calculator"></i></div>
                 <div class="step-title">3. Estimate</div>
             </div>
-            <div class="step-item @(!isCancelled && stepIndex >= 4 ? "completed" : "") @(!isCancelled && stepIndex == 4 ? "active" : "")">
+            <div class="step-item @(!isCancelled && stepIndex >= 4 ? "completed" : "") @(!isCancelled && stepIndex == 4 && stepIndex < 7 ? "active" : "")">
                 <div class="step-bubble"><i class="bi bi-wrench"></i></div>
                 <div class="step-title">4. Repairing</div>
             </div>
-            <div class="step-item @(!isCancelled && stepIndex >= 5 ? "completed" : "") @(!isCancelled && stepIndex == 5 ? "active" : "")">
+            <div class="step-item @(!isCancelled && stepIndex >= 5 ? "completed" : "") @(!isCancelled && stepIndex == 5 && stepIndex < 7 ? "active" : "")">
                 <div class="step-bubble"><i class="bi bi-shield-check"></i></div>
                 <div class="step-title">5. Quality Check</div>
             </div>
-            <div class="step-item @(!isCancelled && stepIndex >= 6 ? "completed" : "") @(!isCancelled && stepIndex == 6 ? "active" : "")">
+            <div class="step-item @(!isCancelled && stepIndex >= 6 ? "completed" : "") @(!isCancelled && stepIndex == 6 && stepIndex < 7 ? "active" : "")">
                 <div class="step-bubble"><i class="bi bi-car-front"></i></div>
                 <div class="step-title">6. Ready</div>
             </div>
-            <div class="step-item @(!isCancelled && stepIndex >= 7 ? "completed" : "") @(!isCancelled && stepIndex == 7 ? "active" : "")">
+            <div class="step-item @(!isCancelled && stepIndex >= 7 ? "completed" : "")">
                 <div class="step-bubble"><i class="bi bi-check2-circle"></i></div>
                 <div class="step-title">7. Delivered</div>
             </div>

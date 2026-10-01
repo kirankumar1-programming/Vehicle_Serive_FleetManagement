@@ -122,6 +122,7 @@ public interface IRoadsideService
     Task<RoadsideRequestDto?> GetRequestByIdAsync(int id);
     Task<RoadsideRequestDto> CreateRequestAsync(CreateRoadsideRequestDto dto);
     Task<RoadsideRequestDto> UpdateRequestStatusAsync(int requestId, RoadsideStatus status, string? notes = null, string? techName = null, string? techPhone = null);
+    Task<RoadsideRequestDto> UpdateRequestDetailsAsync(UpdateRoadsideRequestDto dto);
 }
 
 public interface IPreventiveMaintenanceService

@@ -488,6 +488,92 @@ Verify zero potential using a calibrated Category IV 1000V multimeter."
         response.EntityCards.Should().Contain(c => c.Type == "WarrantyClaim");
     }
 
+    [Fact]
+    public async Task RagOrchestrator_SessionHistoryPersistence_StoresFullResponseAndRetrievesAcrossPageChanges()
+    {
+        string sessionId = "session_persisted_123";
+
+        // Turn 1 on Page A
+        var resp1 = await _ragOrchestrator.ProcessQueryAsync(
+            "What is the warranty policy for engine repairs?",
+            "cust_rag_01",
+            "Customer",
+            sessionId: sessionId,
+            contextUrl: "/Customer/Index");
+
+        // Turn 2 on Page B (simulating page navigation)
+        var resp2 = await _ragOrchestrator.ProcessQueryAsync(
+            "Show my registered vehicles",
+            "cust_rag_01",
+            "Customer",
+            sessionId: sessionId,
+            contextUrl: "/Customer/Appointments");
+
+        // Fetch History for session
+        var history = await _ragOrchestrator.GetSessionHistoryAsync(sessionId);
+
+        // Assert: Both turns are persisted in order and contain FullResponseJson
+        history.Should().HaveCount(2);
+        history[0].UserMessage.Should().Be("What is the warranty policy for engine repairs?");
+        history[0].FullResponseJson.Should().NotBeNullOrEmpty();
+        history[0].FullResponseJson.Should().ContainEquivalentOf("engine");
+
+        history[1].UserMessage.Should().Be("Show my registered vehicles");
+        history[1].FullResponseJson.Should().NotBeNullOrEmpty();
+        history[1].FullResponseJson.Should().ContainEquivalentOf("KA05MK9900");
+    }
+
+    [Fact]
+    public async Task RagOrchestrator_PendingEstimates_ExcludesCancelledJobCardEstimates()
+    {
+        // Arrange: Create a cancelled appointment & job card with a pending estimate
+        var appt = new ServiceAppointment
+        {
+            Id = 999,
+            CustomerId = "cust_rag_01",
+            VehicleId = 101,
+            AppointmentDate = DateTime.UtcNow,
+            TimeSlot = "10:00 AM",
+            Status = AppointmentStatus.Cancelled,
+            CancellationReason = "Customer request"
+        };
+        _context.ServiceAppointments.Add(appt);
+
+        var cancelledJc = new ServiceJobCard
+        {
+            Id = 999,
+            AppointmentId = appt.Id,
+            VehicleId = 101,
+            JobCardNumber = "JC-CANCELLED-999",
+            Status = AppointmentStatus.Cancelled
+        };
+        _context.ServiceJobCards.Add(cancelledJc);
+
+        var cancelledEstimate = new RepairEstimate
+        {
+            Id = 999,
+            JobCardId = cancelledJc.Id,
+            EstimateNumber = "EST-CANCELLED-999",
+            GrandTotal = 5000m,
+            ApprovalStatus = EstimateApprovalStatus.Pending,
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.RepairEstimates.Add(cancelledEstimate);
+        await _context.SaveChangesAsync();
+
+        // Act: Customer asks for pending repair estimates
+        var response = await _ragOrchestrator.ProcessQueryAsync(
+            "Do I have any pending repair estimates?",
+            "cust_rag_01",
+            "Customer",
+            sessionId: "test_estimate_session",
+            contextUrl: "/Customer/Appointments");
+
+        // Assert: Cancelled estimate must NOT be returned in EntityCards or Reply
+        response.EntityCards.Should().NotContain(c => c.Title.Contains("EST-CANCELLED-999"));
+        response.Reply.Should().NotContain("EST-CANCELLED-999");
+    }
+
     public void Dispose()
     {
         _context.Database.EnsureDeleted();

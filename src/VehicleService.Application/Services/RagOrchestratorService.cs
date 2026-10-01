@@ -53,7 +53,7 @@ public class RagOrchestratorService : IRagOrchestratorService, IChatbotService
             response.Reply = $"👋 Hello! I am **AutoBot**, your AI assistant for AutoPro Fleet & Service Hub. I am grounded with our **official service manuals, warranty policies, 24/7 roadside protocols**, and **live database records** for your vehicles, appointments, and repair orders.\n\nHow can I assist you right now?";
             response.SuggestedActions = await GetQuickPromptsForRoleAsync(userRole);
             response.SuggestedQuestions = GetDefaultFollowups(userRole);
-            await SaveHistoryAsync(sessionId, userId, userRole, cleanMsg, response.Reply, response.Sources);
+            await SaveHistoryAsync(sessionId, userId, userRole, cleanMsg, response);
             return response;
         }
 
@@ -121,7 +121,7 @@ public class RagOrchestratorService : IRagOrchestratorService, IChatbotService
         PopulateDynamicActionsAndFollowups(response, userRole, lower);
 
         // 6. PERSIST TURN
-        await SaveHistoryAsync(sessionId, userId, userRole, cleanMsg, response.Reply, response.Sources);
+        await SaveHistoryAsync(sessionId, userId, userRole, cleanMsg, response);
 
         return response;
     }
@@ -372,7 +372,13 @@ public class RagOrchestratorService : IRagOrchestratorService, IChatbotService
         return oneLine.Substring(0, maxChars) + "...";
     }
 
-    private async Task SaveHistoryAsync(string sessionId, string? userId, string userRole, string message, string response, List<ChatSourceCitationDto> sources)
+    private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = false
+    };
+
+    private async Task SaveHistoryAsync(string sessionId, string? userId, string userRole, string message, ChatResponseDto response)
     {
         try
         {
@@ -382,8 +388,9 @@ public class RagOrchestratorService : IRagOrchestratorService, IChatbotService
                 UserId = userId,
                 UserRole = userRole,
                 UserMessage = message,
-                BotResponse = response,
-                MatchedSourcesJson = sources.Count > 0 ? JsonSerializer.Serialize(sources) : null,
+                BotResponse = response.Reply,
+                MatchedSourcesJson = response.Sources.Count > 0 ? JsonSerializer.Serialize(response.Sources, JsonOptions) : null,
+                FullResponseJson = JsonSerializer.Serialize(response, JsonOptions),
                 Timestamp = DateTime.UtcNow
             };
             await _unitOfWork.Repository<ChatMessageHistory>().AddAsync(history);

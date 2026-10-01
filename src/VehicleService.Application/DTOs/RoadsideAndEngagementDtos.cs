@@ -1,4 +1,4 @@
-﻿using VehicleService.Domain.Enums;
+using VehicleService.Domain.Enums;
 
 namespace VehicleService.Application.DTOs;
 
@@ -38,6 +38,21 @@ public class CreateRoadsideRequestDto
     public double? Longitude { get; set; }
     public string ContactPhone { get; set; } = string.Empty;
     public string? IssueDescription { get; set; }
+}
+
+public class UpdateRoadsideRequestDto
+{
+    public int RequestId { get; set; }
+    public RoadsideRequestType? RequestType { get; set; }
+    public RoadsideStatus Status { get; set; }
+    public string LocationAddress { get; set; } = string.Empty;
+    public string ContactPhone { get; set; } = string.Empty;
+    public string? IssueDescription { get; set; }
+    public string? AssignedTechnicianName { get; set; }
+    public string? AssignedTechnicianPhone { get; set; }
+    public string? TowTruckPlate { get; set; }
+    public DateTime? EstimatedArrivalTime { get; set; }
+    public string? ResolutionNotes { get; set; }
 }
 
 public class CustomerReviewDto

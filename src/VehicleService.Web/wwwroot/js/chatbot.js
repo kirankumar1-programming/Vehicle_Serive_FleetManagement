@@ -16,37 +16,71 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (!launcher || !windowEl) return;
 
-    // Session Management
-    let sessionId = localStorage.getItem("autopro_rag_session_id");
+    const chatbotContainer = document.getElementById("autopro-chatbot");
+    const currentUserId = (chatbotContainer && chatbotContainer.dataset.userId) ? chatbotContainer.dataset.userId.trim() : "";
+
+    // User-scoped Session & Open State Persistence using sessionStorage for active login session
+    const storageKey = currentUserId ? ("autopro_rag_session_id_" + currentUserId) : "autopro_rag_session_id_guest";
+    const isOpenKey = currentUserId ? ("autopro_chat_open_" + currentUserId) : "autopro_chat_open_guest";
+
+    // Clear legacy localStorage session keys if present to ensure clean fresh logins
+    try {
+        localStorage.removeItem(storageKey);
+        localStorage.removeItem("autopro_rag_session_id_guest");
+    } catch (e) { }
+
+    // Detect if logged-in user changed in the active browser session
+    const lastUserId = sessionStorage.getItem("autopro_rag_last_user_id");
+    if (lastUserId && lastUserId !== currentUserId) {
+        sessionStorage.removeItem("autopro_rag_session_id_" + lastUserId);
+        sessionStorage.removeItem("autopro_chat_open_" + lastUserId);
+    }
+    sessionStorage.setItem("autopro_rag_last_user_id", currentUserId);
+
+    let sessionId = sessionStorage.getItem(storageKey);
     if (!sessionId) {
         sessionId = "sess_" + Math.random().toString(36).substring(2, 11) + "_" + Date.now();
-        localStorage.setItem("autopro_rag_session_id", sessionId);
+        sessionStorage.setItem(storageKey, sessionId);
     }
+
+    // Restore Chat Window Open/Close state across page changes in active session
+    const wasOpen = sessionStorage.getItem(isOpenKey) === "true";
+    if (wasOpen) {
+        windowEl.classList.remove("d-none");
+        loadPrompts();
+    }
+
+    // Load Chat History on Page Init
+    loadHistory();
 
     // Toggle Chat Window
     launcher.addEventListener("click", function () {
         const isHidden = windowEl.classList.contains("d-none");
         if (isHidden) {
             windowEl.classList.remove("d-none");
+            sessionStorage.setItem(isOpenKey, "true");
             inputEl.focus();
             scrollToBottom();
             loadPrompts();
         } else {
             windowEl.classList.add("d-none");
+            sessionStorage.setItem(isOpenKey, "false");
         }
     });
 
     closeBtn.addEventListener("click", function () {
         windowEl.classList.add("d-none");
+        sessionStorage.setItem(isOpenKey, "false");
     });
 
     minBtn.addEventListener("click", function () {
         windowEl.classList.add("d-none");
+        sessionStorage.setItem(isOpenKey, "false");
     });
 
     // Clear History
     clearBtn.addEventListener("click", async function () {
-        if (!confirm("Clear your chat conversation history?")) return;
+        if (!confirm("Are you sure you want to clear your Q&A conversation history?")) return;
         try {
             await fetch("/Chatbot/ClearHistory", {
                 method: "POST",
@@ -54,13 +88,16 @@ document.addEventListener("DOMContentLoaded", function () {
                 body: JSON.stringify({ sessionId: sessionId })
             });
             sessionId = "sess_" + Math.random().toString(36).substring(2, 11) + "_" + Date.now();
-            localStorage.setItem("autopro_rag_session_id", sessionId);
+            sessionStorage.setItem(storageKey, sessionId);
             messagesEl.innerHTML = `
                 <div class="chat-bubble-container bot">
                     <div class="bot-icon-circle"><i class="bi bi-robot"></i></div>
                     <div class="chat-bubble bot">
                         <div class="bubble-text">
-                            History cleared. How can I help you with our <strong>documents</strong> or <strong>database records</strong>?
+                            👋 <strong>Welcome to AutoBot!</strong> Q&A history cleared. How can I help you with our <strong>documents</strong> or <strong>database records</strong>?
+                        </div>
+                        <div class="bubble-meta">
+                            <span class="badge bg-secondary-subtle text-secondary"><i class="bi bi-shield-check"></i> System Initialized</span>
                         </div>
                     </div>
                 </div>
@@ -158,6 +195,41 @@ document.addEventListener("DOMContentLoaded", function () {
         micBtn.style.display = "none";
     }
 
+    // Load Chat History from Server for Active Session
+    async function loadHistory() {
+        if (!sessionId) return;
+        try {
+            const res = await fetch("/Chatbot/History?sessionId=" + encodeURIComponent(sessionId));
+            if (!res.ok) return;
+            const history = await res.json();
+            if (Array.isArray(history) && history.length > 0) {
+                messagesEl.innerHTML = "";
+                history.forEach(item => {
+                    if (item.userMessage) {
+                        appendUserMessage(item.userMessage, false);
+                    }
+                    if (item.fullResponseJson) {
+                        try {
+                            const fullData = JSON.parse(item.fullResponseJson);
+                            appendBotResponse(fullData, false);
+                        } catch (e) {
+                            appendBotResponse({ reply: item.botResponse }, false);
+                        }
+                    } else if (item.botResponse) {
+                        let sources = [];
+                        if (item.matchedSourcesJson) {
+                            try { sources = JSON.parse(item.matchedSourcesJson); } catch (e) {}
+                        }
+                        appendBotResponse({ reply: item.botResponse, sources: sources }, false);
+                    }
+                });
+                scrollToBottom();
+            }
+        } catch (e) {
+            console.error("Failed to load chat history", e);
+        }
+    }
+
     // Load Quick Suggestion Pills
     async function loadPrompts() {
         if (promptsBar.children.length > 0) return;
@@ -182,7 +254,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    function appendUserMessage(msg) {
+    function appendUserMessage(msg, autoScroll = true) {
         const container = document.createElement("div");
         container.className = "chat-bubble-container user";
         container.innerHTML = `
@@ -191,34 +263,49 @@ document.addEventListener("DOMContentLoaded", function () {
             </div>
         `;
         messagesEl.appendChild(container);
-        scrollToBottom();
+        if (autoScroll) scrollToBottom();
     }
 
-    function appendBotResponse(data) {
+    function appendBotResponse(data, autoScroll = true) {
+        if (!data) return;
         const container = document.createElement("div");
         container.className = "chat-bubble-container bot";
+
+        // Handle case variations (camelCase vs PascalCase) from JSON serialization
+        const replyText = data.reply || data.Reply || data.botResponse || data.BotResponse || '';
+        const entityCards = data.entityCards || data.EntityCards || [];
+        const sources = data.sources || data.Sources || [];
+        const suggestedQuestions = data.suggestedQuestions || data.SuggestedQuestions || [];
 
         let html = `
             <div class="bot-icon-circle"><i class="bi bi-robot"></i></div>
             <div class="chat-bubble bot">
-                <div class="bubble-text">${formatMarkdown(data.reply || '')}</div>
+                <div class="bubble-text">${formatMarkdown(replyText)}</div>
         `;
 
         // Entity Cards
-        if (Array.isArray(data.entityCards) && data.entityCards.length > 0) {
-            data.entityCards.forEach(card => {
+        if (Array.isArray(entityCards) && entityCards.length > 0) {
+            entityCards.forEach(card => {
+                const title = card.title || card.Title || '';
+                const subtitle = card.subtitle || card.Subtitle || '';
+                const badgeText = card.badgeText || card.BadgeText || '';
+                const badgeColor = card.badgeColor || card.BadgeColor || 'primary';
+                const keyValues = card.keyValues || card.KeyValues || null;
+                const actionUrl = card.actionUrl || card.ActionUrl || '';
+                const actionText = card.actionText || card.ActionText || 'View Details';
+
                 html += `
                     <div class="chat-entity-card">
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
-                                <div class="card-title">${escapeHtml(card.title)}</div>
-                                <div class="card-subtitle">${escapeHtml(card.subtitle)}</div>
+                                <div class="card-title">${escapeHtml(title)}</div>
+                                <div class="card-subtitle">${escapeHtml(subtitle)}</div>
                             </div>
-                            <span class="badge bg-${card.badgeColor || 'primary'}">${escapeHtml(card.badgeText)}</span>
+                            <span class="badge bg-${badgeColor}">${escapeHtml(badgeText)}</span>
                         </div>
                 `;
-                if (card.keyValues) {
-                    for (const [k, v] of Object.entries(card.keyValues)) {
+                if (keyValues) {
+                    for (const [k, v] of Object.entries(keyValues)) {
                         html += `
                             <div class="chat-entity-kv">
                                 <span class="text-muted">${escapeHtml(k)}:</span>
@@ -227,11 +314,11 @@ document.addEventListener("DOMContentLoaded", function () {
                         `;
                     }
                 }
-                if (card.actionUrl) {
+                if (actionUrl) {
                     html += `
                         <div class="chat-entity-action">
-                            <a href="${card.actionUrl}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 0.75rem;">
-                                ${escapeHtml(card.actionText || 'View Details')} &rarr;
+                            <a href="${actionUrl}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 0.75rem;">
+                                ${escapeHtml(actionText)} &rarr;
                             </a>
                         </div>
                     `;
@@ -241,16 +328,20 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         // Citations / Sources
-        if (Array.isArray(data.sources) && data.sources.length > 0) {
+        if (Array.isArray(sources) && sources.length > 0) {
             html += `<div class="citation-container">`;
-            data.sources.forEach(src => {
-                const isDoc = src.sourceType === "Document";
+            sources.forEach(src => {
+                const title = src.title || src.Title || '';
+                const section = src.section || src.Section || '';
+                const snippet = src.snippet || src.Snippet || '';
+                const sourceType = src.sourceType || src.SourceType || 'Document';
+                const isDoc = sourceType === "Document";
                 const badgeClass = isDoc ? "doc" : "db";
                 const icon = isDoc ? "bi-file-earmark-text" : "bi-database-check";
                 html += `
-                    <span class="citation-badge ${badgeClass}" title="${escapeHtml(src.snippet || '')}">
+                    <span class="citation-badge ${badgeClass}" title="${escapeHtml(snippet)}">
                         <i class="bi ${icon}"></i>
-                        ${escapeHtml(src.title)} (${escapeHtml(src.section)})
+                        ${escapeHtml(title)}${section ? ` (${escapeHtml(section)})` : ''}
                     </span>
                 `;
             });
@@ -258,9 +349,9 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         // Follow-up Suggestions
-        if (Array.isArray(data.suggestedQuestions) && data.suggestedQuestions.length > 0) {
+        if (Array.isArray(suggestedQuestions) && suggestedQuestions.length > 0) {
             html += `<div class="chat-followups">`;
-            data.suggestedQuestions.forEach(q => {
+            suggestedQuestions.forEach(q => {
                 html += `<button type="button" class="followup-btn"><i class="bi bi-chat-dots me-1"></i> ${escapeHtml(q)}</button>`;
             });
             html += `</div>`;
@@ -277,7 +368,7 @@ document.addEventListener("DOMContentLoaded", function () {
         });
 
         messagesEl.appendChild(container);
-        scrollToBottom();
+        if (autoScroll) scrollToBottom();
     }
 
     function appendBotError(errMsg) {

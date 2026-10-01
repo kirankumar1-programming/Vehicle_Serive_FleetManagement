@@ -61,6 +61,7 @@ public static class DbInitializer
                         UserMessage TEXT NOT NULL,
                         BotResponse TEXT NOT NULL,
                         MatchedSourcesJson TEXT,
+                        FullResponseJson TEXT,
                         Timestamp TEXT NOT NULL,
                         IsDeleted INTEGER NOT NULL DEFAULT 0,
                         CreatedAt TEXT NOT NULL,
@@ -69,10 +70,11 @@ public static class DbInitializer
             }
             catch { /* Table may already exist */ }
 
-            // Ensure IsDeleted column exists on existing SQLite databases
+            // Ensure columns exist on existing SQLite databases
             try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE KnowledgeDocuments ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0;"); } catch { }
             try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE DocumentChunks ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0;"); } catch { }
             try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE ChatMessages ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0;"); } catch { }
+            try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE ChatMessages ADD COLUMN FullResponseJson TEXT;"); } catch { }
         }
         else if (context.Database.IsSqlServer())
         {
@@ -134,6 +136,7 @@ public static class DbInitializer
                             UserMessage NVARCHAR(MAX) NOT NULL,
                             BotResponse NVARCHAR(MAX) NOT NULL,
                             MatchedSourcesJson NVARCHAR(MAX),
+                            FullResponseJson NVARCHAR(MAX),
                             Timestamp DATETIME2 NOT NULL,
                             IsDeleted BIT NOT NULL DEFAULT 0,
                             CreatedAt DATETIME2 NOT NULL,
@@ -151,6 +154,10 @@ public static class DbInitializer
                     IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ChatMessages') AND name = 'IsDeleted')
                     BEGIN
                         ALTER TABLE ChatMessages ADD IsDeleted bit NOT NULL CONSTRAINT DF_ChatMessages_IsDeleted DEFAULT 0;
+                    END
+                    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ChatMessages') AND name = 'FullResponseJson')
+                    BEGIN
+                        ALTER TABLE ChatMessages ADD FullResponseJson NVARCHAR(MAX) NULL;
                     END");
             }
             catch { /* Tables may already exist */ }

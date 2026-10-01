@@ -236,7 +236,7 @@ public class DatabaseRagService : IDatabaseRagService
     private async Task QueryCustomerDataAsync(string lower, string userId, DatabaseRagResult result)
     {
         bool askVehicles = lower.Contains("my vehicle") || lower.Contains("my car") || lower.Contains("garage") || lower.Contains("registered vehicle") || lower.Contains("my vehicles");
-        bool askAppointments = lower.Contains("appointment") || lower.Contains("booking") || lower.Contains("schedule") || lower.Contains("booked");
+        bool askAppointments = lower.Contains("appointment") || lower.Contains("booking") || lower.Contains("schedule") || lower.Contains("booked") || lower.Contains("service") || lower.Contains("servicing") || lower.Contains("job") || lower.Contains("track");
         bool askEstimates = lower.Contains("estimate") || lower.Contains("approval") || lower.Contains("quote") || lower.Contains("repair cost");
         bool askInvoices = lower.Contains("invoice") || lower.Contains("bill") || lower.Contains("payment") || lower.Contains("pay") || lower.Contains("receipt");
         bool askWarranties = lower.Contains("warranty") || lower.Contains("warranties") || lower.Contains("claim") || lower.Contains("claims") || lower.Contains("coverage") || lower.Contains("protection plan");
@@ -287,15 +287,16 @@ public class DatabaseRagService : IDatabaseRagService
             }
         }
 
-        // Appointments & Service Bookings
+        // Appointments, Service Bookings & Live Servicing Job Cards
         if (askAppointments)
         {
-            bool askActiveOnly = lower.Contains("active") || lower.Contains("upcoming") || lower.Contains("current") || lower.Contains("next") || lower.Contains("pending") || lower.Contains("open");
+            bool askActiveOnly = lower.Contains("active") || lower.Contains("upcoming") || lower.Contains("current") || lower.Contains("next") || lower.Contains("pending") || lower.Contains("open") || lower.Contains("track") || lower.Contains("servicing") || lower.Contains("job") || lower.Contains("status");
 
             var allAppointments = await _unitOfWork.Repository<ServiceAppointment>().Query()
                 .Include(a => a.Vehicle)
                 .Include(a => a.ServiceCenter)
-                .Include(a => a.JobCard)
+                .Include(a => a.JobCard).ThenInclude(j => j!.ServiceBay)
+                .Include(a => a.JobCard).ThenInclude(j => j!.ServiceAdvisor)
                 .Where(a => string.IsNullOrEmpty(userId) || a.CustomerId == userId)
                 .OrderByDescending(a => a.AppointmentDate)
                 .Take(5)
@@ -311,30 +312,54 @@ public class DatabaseRagService : IDatabaseRagService
                 {
                     foreach (var a in activeAppointments)
                     {
-                        result.ContextSummaries.Add($"Active Appointment #{a.Id} on {a.AppointmentDate:dd MMM yyyy} at {a.TimeSlot} at {a.ServiceCenter?.Name} for {a.Vehicle?.Make} {a.Vehicle?.Model} ({a.Vehicle?.RegistrationNumber}): Status = '{a.Status}'.");
-                        result.EntityCards.Add(new ChatEntityCardDto
+                        if (a.JobCard != null)
                         {
-                            Type = "Appointment",
-                            Title = $"Active Appointment #{a.Id}",
-                            Subtitle = $"{a.AppointmentDate:dd MMM yyyy} at {a.TimeSlot}",
-                            BadgeText = a.Status.ToString(),
-                            BadgeColor = GetStatusColor(a.Status.ToString()),
-                            KeyValues = new()
+                            result.ContextSummaries.Add($"Active Service Job Card {a.JobCard.JobCardNumber} (Appointment #{a.Id}) on {a.AppointmentDate:dd MMM yyyy} at {a.TimeSlot} at {a.ServiceCenter?.Name} for {a.Vehicle?.Make} {a.Vehicle?.Model} ({a.Vehicle?.RegistrationNumber}): Status = '{a.JobCard.Status}'.");
+                            result.EntityCards.Add(new ChatEntityCardDto
                             {
-                                { "Center", a.ServiceCenter?.Name ?? "Main Workshop" },
-                                { "Vehicle", $"{a.Vehicle?.Make} {a.Vehicle?.Model} ({a.Vehicle?.RegistrationNumber})" },
-                                { "Status", a.Status.ToString() }
-                            },
-                            ActionUrl = a.JobCard != null ? $"/Customer/TrackJob/{a.JobCard.Id}" : "/Customer/Appointments",
-                            ActionText = a.JobCard != null ? "Track Live Servicing" : "Manage Appointment"
-                        });
+                                Type = "JobCard",
+                                Title = $"Service Job {a.JobCard.JobCardNumber}",
+                                Subtitle = $"{a.Vehicle?.Make} {a.Vehicle?.Model} ({a.Vehicle?.RegistrationNumber})",
+                                BadgeText = a.JobCard.Status.ToString(),
+                                BadgeColor = GetStatusColor(a.JobCard.Status.ToString()),
+                                KeyValues = new()
+                                {
+                                    { "Workshop", a.ServiceCenter?.Name ?? "Main Workshop" },
+                                    { "Bay", a.JobCard.ServiceBay?.BayName ?? (a.JobCard.ServiceBayId.HasValue ? $"Bay #{a.JobCard.ServiceBayId}" : "Service Bay") },
+                                    { "Advisor", a.JobCard.ServiceAdvisor?.FullName ?? "Service Advisor" },
+                                    { "Status", a.JobCard.Status.ToString() }
+                                },
+                                ActionUrl = $"/Customer/TrackJob/{a.JobCard.Id}",
+                                ActionText = "Track Live Servicing"
+                            });
+                        }
+                        else
+                        {
+                            result.ContextSummaries.Add($"Active Appointment #{a.Id} on {a.AppointmentDate:dd MMM yyyy} at {a.TimeSlot} at {a.ServiceCenter?.Name} for {a.Vehicle?.Make} {a.Vehicle?.Model} ({a.Vehicle?.RegistrationNumber}): Status = '{a.Status}'.");
+                            result.EntityCards.Add(new ChatEntityCardDto
+                            {
+                                Type = "Appointment",
+                                Title = $"Active Appointment #{a.Id}",
+                                Subtitle = $"{a.AppointmentDate:dd MMM yyyy} at {a.TimeSlot}",
+                                BadgeText = a.Status.ToString(),
+                                BadgeColor = GetStatusColor(a.Status.ToString()),
+                                KeyValues = new()
+                                {
+                                    { "Center", a.ServiceCenter?.Name ?? "Main Workshop" },
+                                    { "Vehicle", $"{a.Vehicle?.Make} {a.Vehicle?.Model} ({a.Vehicle?.RegistrationNumber})" },
+                                    { "Status", a.Status.ToString() }
+                                },
+                                ActionUrl = "/Customer/Appointments",
+                                ActionText = "Manage Appointment"
+                            });
+                        }
                     }
 
                     result.DbCitations.Add(new ChatSourceCitationDto
                     {
-                        Title = "Live Active Appointments",
+                        Title = "Live Servicing & Active Bookings",
                         Section = "Workshop Booking Ledger",
-                        Snippet = $"{activeAppointments.Count} active service booking(s) found.",
+                        Snippet = $"{activeAppointments.Count} active servicing job(s) / booking(s) found.",
                         SourceType = "Database",
                         Score = 1.0,
                         LinkUrl = "/Customer/Appointments"
@@ -401,8 +426,11 @@ public class DatabaseRagService : IDatabaseRagService
         {
             var estimates = await _unitOfWork.Repository<RepairEstimate>().Query()
                 .Include(e => e.JobCard).ThenInclude(j => j!.Vehicle)
+                .Include(e => e.JobCard).ThenInclude(j => j!.Appointment)
                 .Include(e => e.Items)
                 .Where(e => string.IsNullOrEmpty(userId) || (e.JobCard != null && e.JobCard.Vehicle != null && e.JobCard.Vehicle.CustomerId == userId))
+                .Where(e => e.JobCard != null && e.JobCard.Status != AppointmentStatus.Cancelled && (e.JobCard.Appointment == null || e.JobCard.Appointment.Status != AppointmentStatus.Cancelled))
+                .Where(e => e.ApprovalStatus == EstimateApprovalStatus.Pending || e.ApprovalStatus == EstimateApprovalStatus.ClarificationRequested)
                 .OrderByDescending(e => e.CreatedAt)
                 .Take(3)
                 .ToListAsync();

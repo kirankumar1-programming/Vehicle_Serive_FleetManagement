@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using VehicleService.Application.DTOs;
 using VehicleService.Application.Interfaces;
 using VehicleService.Domain.Entities;
@@ -23,7 +23,7 @@ public class MockPaymentService : IPaymentService
     public async Task<PaymentResultDto> ProcessPaymentAsync(PaymentRequestDto request)
     {
         var invoice = await _unitOfWork.Repository<Invoice>().Query()
-            .Include(i => i.JobCard)
+            .Include(i => i.JobCard).ThenInclude(j => j!.Appointment)
             .Include(i => i.Customer)
             .FirstOrDefaultAsync(i => i.Id == request.InvoiceId);
 
@@ -82,11 +82,23 @@ public class MockPaymentService : IPaymentService
             invoice.Status = invoice.PaidAmount >= invoice.GrandTotal ? PaymentStatus.Successful : PaymentStatus.Authorized;
             _unitOfWork.Repository<Invoice>().UpdateAsync(invoice).GetAwaiter().GetResult();
 
-            // Advance JobCard to ReadyForDelivery / Completed if applicable
-            if (invoice.JobCard != null && invoice.JobCard.Status == AppointmentStatus.ReadyForDelivery)
+            // Synchronize JobCard and Appointment status to Completed upon successful invoice payment
+            if (invoice.Status == PaymentStatus.Successful && invoice.JobCard != null)
             {
                 invoice.JobCard.Status = AppointmentStatus.Completed;
+                if (!invoice.JobCard.WorkCompletedAt.HasValue)
+                {
+                    invoice.JobCard.WorkCompletedAt = DateTime.UtcNow;
+                }
+                invoice.JobCard.ServiceBayId = null; // Release service bay if assigned
                 _unitOfWork.Repository<ServiceJobCard>().UpdateAsync(invoice.JobCard).GetAwaiter().GetResult();
+
+                if (invoice.JobCard.Appointment != null)
+                {
+                    invoice.JobCard.Appointment.Status = AppointmentStatus.Completed;
+                    invoice.JobCard.Appointment.ServiceBayId = null;
+                    _unitOfWork.Repository<ServiceAppointment>().UpdateAsync(invoice.JobCard.Appointment).GetAwaiter().GetResult();
+                }
             }
 
             _unitOfWork.SaveChangesAsync().GetAwaiter().GetResult();

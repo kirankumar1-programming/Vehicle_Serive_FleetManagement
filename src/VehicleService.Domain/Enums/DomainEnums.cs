@@ -140,6 +140,7 @@ public enum RoadsideStatus
     AgentAssigned,
     TechnicianDispatched,
     TechnicianArrived,
+    InTow,
     IssueResolved,
     Cancelled
 }

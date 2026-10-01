@@ -447,6 +447,22 @@ public class CustomerController : Controller
         return RedirectToAction(nameof(Roadside));
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateRoadsideRequest(UpdateRoadsideRequestDto dto)
+    {
+        try
+        {
+            var updated = await _roadsideService.UpdateRequestDetailsAsync(dto);
+            TempData["SuccessMessage"] = $"Roadside request {updated.RequestNumber} updated successfully!";
+        }
+        catch (Exception ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+        return RedirectToAction(nameof(Roadside));
+    }
+
     // 8. Warranties & Claims
     public async Task<IActionResult> Warranties()
     {

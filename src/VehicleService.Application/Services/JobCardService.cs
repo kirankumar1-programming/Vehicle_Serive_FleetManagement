@@ -485,6 +485,7 @@ public class JobCardService : IJobCardService
             .Include(j => j.Appointment).ThenInclude(a => a!.PartReservations)
             .Include(j => j.Appointment).ThenInclude(a => a!.Customer)
             .Include(j => j.Vehicle)
+            .Include(j => j.RepairEstimates)
             .FirstOrDefaultAsync(j => j.Id == jobCardId);
 
         if (jobCard == null) return false;
@@ -505,6 +506,18 @@ public class JobCardService : IJobCardService
         jobCard.ServiceBayId = null;
 
         await _unitOfWork.Repository<ServiceJobCard>().UpdateAsync(jobCard);
+
+        // Reject/cancel any pending estimates on this job card
+        if (jobCard.RepairEstimates != null)
+        {
+            foreach (var est in jobCard.RepairEstimates.Where(e => e.ApprovalStatus == EstimateApprovalStatus.Pending || e.ApprovalStatus == EstimateApprovalStatus.ClarificationRequested))
+            {
+                est.ApprovalStatus = EstimateApprovalStatus.Rejected;
+                est.CustomerNotes = $"Auto-rejected due to job card cancellation: {reason}";
+                est.CustomerRespondedAt = DateTime.UtcNow;
+                await _unitOfWork.Repository<RepairEstimate>().UpdateAsync(est);
+            }
+        }
 
         // 2. Synchronize Appointment Status & Release Reserved Parts
         if (jobCard.Appointment != null)

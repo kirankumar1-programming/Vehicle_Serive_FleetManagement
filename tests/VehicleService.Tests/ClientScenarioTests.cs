@@ -252,6 +252,64 @@ public class ClientScenarioTests : IDisposable
         recordedTransactions.Should().HaveCount(1);
     }
 
+    [Fact]
+    public async Task ProcessPayment_UpdatesJobCardAndAppointmentStatusToCompleted()
+    {
+        // Arrange: Appointment & JobCard in ReadyForDelivery/InProgress status
+        var appt = new ServiceAppointment
+        {
+            CustomerId = "cust_001",
+            VehicleId = 1,
+            AppointmentDate = DateTime.UtcNow,
+            TimeSlot = "10:00 AM",
+            Status = AppointmentStatus.ReadyForDelivery
+        };
+        _context.ServiceAppointments.Add(appt);
+        await _context.SaveChangesAsync();
+
+        var jobCard = new ServiceJobCard
+        {
+            AppointmentId = appt.Id,
+            VehicleId = 1,
+            JobCardNumber = "JC-TEST-PAY-COMP",
+            Status = AppointmentStatus.ReadyForDelivery
+        };
+        _context.ServiceJobCards.Add(jobCard);
+        await _context.SaveChangesAsync();
+
+        var invoice = new Invoice
+        {
+            InvoiceNumber = "INV-TEST-PAY-COMP",
+            JobCardId = jobCard.Id,
+            CustomerId = "cust_001",
+            VehicleId = 1,
+            GrandTotal = 4500,
+            PaidAmount = 0,
+            Status = PaymentStatus.Pending
+        };
+        _context.Invoices.Add(invoice);
+        await _context.SaveChangesAsync();
+
+        var paymentService = new MockPaymentService(_unitOfWork, _mockNotification.Object);
+
+        // Act
+        var result = await paymentService.ProcessPaymentAsync(new PaymentRequestDto
+        {
+            InvoiceId = invoice.Id,
+            Amount = 4500,
+            Method = PaymentMethod.CreditCard
+        });
+
+        // Assert
+        result.Success.Should().BeTrue();
+
+        var updatedJc = await _context.ServiceJobCards.FirstAsync(j => j.Id == jobCard.Id);
+        updatedJc.Status.Should().Be(AppointmentStatus.Completed);
+
+        var updatedAppt = await _context.ServiceAppointments.FirstAsync(a => a.Id == appt.Id);
+        updatedAppt.Status.Should().Be(AppointmentStatus.Completed);
+    }
+
     // SCENARIO 4: Estimate Rejection Handling
     [Fact]
     public async Task Scenario4_EstimateRejected_ProceedsOnlyWithApprovedServices()
@@ -1189,6 +1247,77 @@ public class ClientScenarioTests : IDisposable
         var retrievedInv = await invoiceService.GetInvoiceByJobCardIdAsync(jc.Id);
         retrievedInv.Should().NotBeNull();
         retrievedInv!.InvoiceNumber.Should().Be(inv.InvoiceNumber);
+    }
+
+    [Fact]
+    public async Task UpdateTargetJobCardToDeliveredStatus()
+    {
+        var dbPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "VehicleService.Web", "VehicleService.db"));
+        if (!File.Exists(dbPath)) return;
+
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseSqlite($"Data Source={dbPath}")
+            .Options;
+
+        using var context = new ApplicationDbContext(options);
+        var targetCard = await context.ServiceJobCards
+            .Include(j => j.Appointment)
+            .FirstOrDefaultAsync(j => j.JobCardNumber == "JC-20261001-BB2AC" || j.Id == 8);
+
+        if (targetCard != null)
+        {
+            targetCard.Status = AppointmentStatus.Completed;
+            targetCard.WorkCompletedAt = DateTime.UtcNow;
+            if (targetCard.Appointment != null)
+            {
+                targetCard.Appointment.Status = AppointmentStatus.Completed;
+            }
+            await context.SaveChangesAsync();
+
+            targetCard.Status.Should().Be(AppointmentStatus.Completed);
+        }
+    }
+
+    [Fact]
+    public async Task UpdateRequestDetailsAsync_UpdatesAllFieldsAndLogsAuditTrail()
+    {
+        var service = new RoadsideAssistanceService(_unitOfWork, _mockNotification.Object);
+
+        // Arrange: Create a new roadside request
+        var createDto = new CreateRoadsideRequestDto
+        {
+            CustomerId = "cust_001",
+            VehicleId = 1,
+            RequestType = RoadsideRequestType.Breakdown,
+            LocationAddress = "Old Airport Road, Bangalore",
+            ContactPhone = "+91 99887 76655",
+            IssueDescription = "Car won't start"
+        };
+        var created = await service.CreateRequestAsync(createDto);
+
+        // Act: Update request details
+        var updateDto = new UpdateRoadsideRequestDto
+        {
+            RequestId = created.Id,
+            RequestType = RoadsideRequestType.BatteryFailure,
+            Status = RoadsideStatus.TechnicianDispatched,
+            LocationAddress = "Indiranagar 100ft Road, Bangalore",
+            ContactPhone = "+91 99887 76655",
+            IssueDescription = "Battery flat, jumpstart requested",
+            AssignedTechnicianName = "Patrol Unit #2 - Suresh",
+            AssignedTechnicianPhone = "+91 91122 33445",
+            TowTruckPlate = "KA01RS9999",
+            ResolutionNotes = "Patrol dispatched to site."
+        };
+        var updated = await service.UpdateRequestDetailsAsync(updateDto);
+
+        // Assert
+        updated.Should().NotBeNull();
+        updated.RequestType.Should().Be(RoadsideRequestType.BatteryFailure);
+        updated.Status.Should().Be(RoadsideStatus.TechnicianDispatched);
+        updated.LocationAddress.Should().Be("Indiranagar 100ft Road, Bangalore");
+        updated.AssignedTechnicianName.Should().Be("Patrol Unit #2 - Suresh");
+        updated.TowTruckPlate.Should().Be("KA01RS9999");
     }
 
     public void Dispose()

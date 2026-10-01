@@ -227,7 +227,57 @@ public class RoadsideAssistanceService : IRoadsideService
                 "Roadside Assistance Update",
                 $"Your roadside request {req.RequestNumber} is now: {status}.",
                 NotificationType.Roadside,
-                $"/Customer/RoadsideDetails/{req.Id}");
+                $"/Customer/Roadside");
+        }
+
+        return (await GetRequestByIdAsync(req.Id))!;
+    }
+
+    public async Task<RoadsideRequestDto> UpdateRequestDetailsAsync(UpdateRoadsideRequestDto dto)
+    {
+        var req = await _unitOfWork.Repository<RoadsideAssistanceRequest>().GetByIdAsync(dto.RequestId);
+        if (req == null) throw new DomainException("Roadside assistance request not found.");
+
+        req.Status = dto.Status;
+        if (dto.RequestType.HasValue) req.RequestType = dto.RequestType.Value;
+        if (!string.IsNullOrEmpty(dto.LocationAddress)) req.LocationAddress = dto.LocationAddress;
+        if (!string.IsNullOrEmpty(dto.ContactPhone)) req.ContactPhone = dto.ContactPhone;
+        if (dto.IssueDescription != null) req.IssueDescription = dto.IssueDescription;
+        if (dto.AssignedTechnicianName != null) req.AssignedTechnicianName = dto.AssignedTechnicianName;
+        if (dto.AssignedTechnicianPhone != null) req.AssignedTechnicianPhone = dto.AssignedTechnicianPhone;
+        if (dto.TowTruckPlate != null) req.TowTruckPlate = dto.TowTruckPlate;
+        if (dto.EstimatedArrivalTime.HasValue) req.EstimatedArrivalTime = dto.EstimatedArrivalTime.Value;
+
+        if (dto.Status == RoadsideStatus.TechnicianArrived && !req.ActualArrivalTime.HasValue)
+        {
+            req.ActualArrivalTime = DateTime.UtcNow;
+        }
+        if (dto.Status == RoadsideStatus.IssueResolved)
+        {
+            req.ResolvedAt = DateTime.UtcNow;
+            if (!string.IsNullOrEmpty(dto.ResolutionNotes)) req.ResolutionNotes = dto.ResolutionNotes;
+        }
+
+        await _unitOfWork.Repository<RoadsideAssistanceRequest>().UpdateAsync(req);
+
+        await _unitOfWork.Repository<RoadsideLog>().AddAsync(new RoadsideLog
+        {
+            RoadsideAssistanceRequestId = req.Id,
+            Status = dto.Status,
+            Message = !string.IsNullOrEmpty(dto.ResolutionNotes) ? dto.ResolutionNotes : $"Request details updated. Status: {dto.Status}",
+            Timestamp = DateTime.UtcNow
+        });
+
+        await _unitOfWork.SaveChangesAsync();
+
+        if (!string.IsNullOrEmpty(req.CustomerId))
+        {
+            await _notificationService.SendNotificationAsync(
+                req.CustomerId,
+                "Roadside Assistance Update",
+                $"Your roadside request {req.RequestNumber} details were updated.",
+                NotificationType.Roadside,
+                $"/Customer/Roadside");
         }
 
         return (await GetRequestByIdAsync(req.Id))!;

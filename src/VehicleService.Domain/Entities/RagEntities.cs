@@ -37,5 +37,6 @@ public class ChatMessageHistory : BaseEntity
     public string UserMessage { get; set; } = string.Empty;
     public string BotResponse { get; set; } = string.Empty;
     public string? MatchedSourcesJson { get; set; }
+    public string? FullResponseJson { get; set; }
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 }

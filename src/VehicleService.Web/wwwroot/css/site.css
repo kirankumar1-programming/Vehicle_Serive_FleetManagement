@@ -330,8 +330,7 @@ h5.fw-bold.text-primary i {
 
 .badge-status.confirmed { background-color: #dbeafe; color: #1e40af; }
 .badge-status.in-progress { background-color: #fef3c7; color: #92400e; }
-.badge-status.ready { background-color: #d1fae5; color: #065f46; }
-.badge-status.completed { background-color: #e0e7ff; color: #3730a3; }
+.badge-status.ready, .badge-status.completed, .badge-status.delivered { background-color: #d1fae5; color: #065f46; }
 .badge-status.cancelled { background-color: #fee2e2; color: #991b1b; }
 
 /* Buttons */
