@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -39,7 +39,13 @@ public class AccountController : Controller
             return View(model);
         }
 
-        var result = await _signInManager.PasswordSignInAsync(user, model.Password, model.RememberMe, false);
+        var result = await _signInManager.PasswordSignInAsync(user, model.Password, model.RememberMe, lockoutOnFailure: true);
+        if (result.IsLockedOut)
+        {
+            ModelState.AddModelError("", "This account is temporarily locked due to multiple failed login attempts. Please try again later.");
+            return View(model);
+        }
+
         if (result.Succeeded)
         {
             return RedirectToRoleDashboard(user.RoleType, returnUrl);
@@ -61,6 +67,9 @@ public class AccountController : Controller
     {
         if (!ModelState.IsValid) return View(model);
 
+        // Security: Restrict public registration to Customer role
+        model.RoleType = UserRoleType.Customer;
+
         var existing = await _userManager.FindByEmailAsync(model.Email);
         if (existing != null)
         {
@@ -74,16 +83,17 @@ public class AccountController : Controller
             Email = model.Email,
             FullName = model.FullName,
             PhoneNumber = model.PhoneNumber,
-            RoleType = model.RoleType,
+            RoleType = UserRoleType.Customer,
             Address = model.Address,
             City = model.City,
-            EmailConfirmed = true
+            EmailConfirmed = true,
+            IsActive = true
         };
 
         var result = await _userManager.CreateAsync(user, model.Password);
         if (result.Succeeded)
         {
-            await _userManager.AddToRoleAsync(user, model.RoleType.ToString());
+            await _userManager.AddToRoleAsync(user, UserRoleType.Customer.ToString());
             await _signInManager.SignInAsync(user, isPersistent: false);
             return RedirectToRoleDashboard(user.RoleType);
         }

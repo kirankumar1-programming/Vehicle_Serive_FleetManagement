@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using VehicleService.Domain.Enums;
 
 namespace VehicleService.Application.DTOs;
@@ -33,18 +34,37 @@ public class AppointmentDto
 
 public class BookAppointmentDto
 {
+    [Required(ErrorMessage = "Vehicle is required.")]
+    [Range(1, int.MaxValue, ErrorMessage = "A valid Vehicle ID is required.")]
     public int VehicleId { get; set; }
+
     public string? CustomerId { get; set; }
+
+    [Required(ErrorMessage = "Service Center is required.")]
+    [Range(1, int.MaxValue, ErrorMessage = "A valid Service Center ID is required.")]
     public int ServiceCenterId { get; set; }
+
     public int? ServiceBayId { get; set; }
     public int? ServiceTypeId { get; set; }
     public int? ServicePackageId { get; set; }
+
+    [Required(ErrorMessage = "Appointment date is required.")]
     public DateTime AppointmentDate { get; set; }
+
+    [Required(ErrorMessage = "Time slot is required.")]
+    [StringLength(50, ErrorMessage = "Time slot cannot exceed 50 characters.")]
     public string TimeSlot { get; set; } = "09:00 AM - 11:00 AM";
+
     public PriorityLevel Priority { get; set; } = PriorityLevel.Medium;
+
+    [StringLength(1000, ErrorMessage = "Customer notes cannot exceed 1000 characters.")]
     public string? CustomerNotes { get; set; }
+
     public bool RequiresPickupDrop { get; set; }
+
+    [StringLength(300, ErrorMessage = "Pickup address cannot exceed 300 characters.")]
     public string? PickupAddress { get; set; }
+
     public List<int> RequiredPartIds { get; set; } = new();
 }
 
@@ -101,9 +121,17 @@ public class WorkLogDto
     public int JobCardId { get; set; }
     public string MechanicId { get; set; } = string.Empty;
     public string MechanicName { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Task description is required.")]
+    [StringLength(500, ErrorMessage = "Task description cannot exceed 500 characters.")]
     public string TaskDescription { get; set; } = string.Empty;
+
+    [Range(0.1, 24.0, ErrorMessage = "Hours spent must be between 0.1 and 24.0.")]
     public decimal HoursSpent { get; set; }
+
     public DateTime LoggedAt { get; set; }
+
+    [StringLength(1000, ErrorMessage = "Observations cannot exceed 1000 characters.")]
     public string? Observations { get; set; }
 }
 
@@ -111,10 +139,16 @@ public class PartConsumptionDto
 {
     public int Id { get; set; }
     public int JobCardId { get; set; }
+
+    [Range(1, int.MaxValue, ErrorMessage = "Valid inventory part ID is required.")]
     public int InventoryPartId { get; set; }
+
     public string PartNumber { get; set; } = string.Empty;
     public string PartName { get; set; } = string.Empty;
+
+    [Range(1, 1000, ErrorMessage = "Quantity must be between 1 and 1000.")]
     public int Quantity { get; set; }
+
     public decimal UnitPrice { get; set; }
     public decimal LineTotal { get; set; }
     public DateTime ConsumedAt { get; set; }
@@ -136,7 +170,12 @@ public class UpdateJobCardDto
 
 public class CancelJobCardDto
 {
+    [Range(1, int.MaxValue)]
     public int JobCardId { get; set; }
+
+    [Required(ErrorMessage = "Cancellation reason is required.")]
+    [StringLength(500, ErrorMessage = "Reason cannot exceed 500 characters.")]
     public string Reason { get; set; } = string.Empty;
+
     public string? CancelledByUserId { get; set; }
 }

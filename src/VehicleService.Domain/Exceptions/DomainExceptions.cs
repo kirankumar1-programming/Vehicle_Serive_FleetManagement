@@ -1,4 +1,4 @@
-﻿namespace VehicleService.Domain.Exceptions;
+namespace VehicleService.Domain.Exceptions;
 
 public class DomainException : Exception
 {
@@ -35,3 +35,9 @@ public class MechanicUnavailableException : DomainException
 {
     public MechanicUnavailableException(string message) : base(message) { }
 }
+
+public class EntityNotFoundException : DomainException
+{
+    public EntityNotFoundException(string message) : base(message) { }
+}
+

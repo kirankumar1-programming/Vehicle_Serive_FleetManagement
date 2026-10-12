@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using VehicleService.Domain.Enums;
 
 namespace VehicleService.Application.DTOs;
@@ -82,11 +83,22 @@ public class InventoryPartDto
 
 public class AdjustStockDto
 {
+    [Range(1, int.MaxValue, ErrorMessage = "Valid Part ID is required.")]
     public int PartId { get; set; }
+
     public InventoryTransactionType TransactionType { get; set; }
+
+    [Range(1, 100000, ErrorMessage = "Quantity must be between 1 and 100,000.")]
     public int Quantity { get; set; }
+
+    [Range(0, 1000000, ErrorMessage = "Unit cost must be non-negative.")]
     public decimal UnitCost { get; set; }
+
+    [StringLength(100, ErrorMessage = "Reference number cannot exceed 100 characters.")]
     public string? ReferenceNumber { get; set; }
+
+    [StringLength(500, ErrorMessage = "Notes cannot exceed 500 characters.")]
     public string? Notes { get; set; }
+
     public string? PerformedByUserId { get; set; }
 }

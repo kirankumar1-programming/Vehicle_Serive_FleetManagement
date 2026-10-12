@@ -75,6 +75,27 @@ public static class DbInitializer
             try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE DocumentChunks ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0;"); } catch { }
             try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE ChatMessages ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0;"); } catch { }
             try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE ChatMessages ADD COLUMN FullResponseJson TEXT;"); } catch { }
+
+            try
+            {
+                await context.Database.ExecuteSqlRawAsync(@"
+                    CREATE TABLE IF NOT EXISTS RefreshTokens (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        Token TEXT NOT NULL,
+                        JwtId TEXT NOT NULL,
+                        ExpiresAt TEXT NOT NULL,
+                        IsRevoked INTEGER NOT NULL DEFAULT 0,
+                        ReplacedByToken TEXT,
+                        UserId TEXT NOT NULL,
+                        CreatedAt TEXT NOT NULL,
+                        UpdatedAt TEXT,
+                        IsDeleted INTEGER NOT NULL DEFAULT 0,
+                        FOREIGN KEY(UserId) REFERENCES AspNetUsers(Id) ON DELETE CASCADE
+                    );
+                    CREATE UNIQUE INDEX IF NOT EXISTS IX_RefreshTokens_Token ON RefreshTokens (Token);
+                    CREATE INDEX IF NOT EXISTS IX_RefreshTokens_JwtId ON RefreshTokens (JwtId);");
+            }
+            catch { }
         }
         else if (context.Database.IsSqlServer())
         {

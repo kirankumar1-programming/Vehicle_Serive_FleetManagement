@@ -175,4 +175,8 @@ public interface IBlobStorageService
 public interface IJwtTokenService
 {
     string GenerateToken(ApplicationUser user, IList<string> roles);
+    Task<(string AccessToken, string RefreshToken, DateTime ExpiresAt)> GenerateTokenWithRefreshTokenAsync(ApplicationUser user, IList<string> roles);
+    Task<AuthResponse> RefreshTokenAsync(string token, string refreshToken);
+    Task<bool> RevokeRefreshTokenAsync(string refreshToken);
+    System.Security.Claims.ClaimsPrincipal? GetPrincipalFromExpiredToken(string token);
 }

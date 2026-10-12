@@ -48,6 +48,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<KnowledgeDocument> KnowledgeDocuments => Set<KnowledgeDocument>();
     public DbSet<DocumentChunk> DocumentChunks => Set<DocumentChunk>();
     public DbSet<ChatMessageHistory> ChatMessages => Set<ChatMessageHistory>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -151,6 +152,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
         {
             b.HasIndex(m => m.SessionId);
             b.HasIndex(m => m.Timestamp);
+        });
+
+        // RefreshTokens
+        builder.Entity<RefreshToken>(b =>
+        {
+            b.HasIndex(r => r.Token).IsUnique();
+            b.HasIndex(r => r.JwtId);
+            b.HasOne(r => r.User).WithMany(u => u.RefreshTokens).HasForeignKey(r => r.UserId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

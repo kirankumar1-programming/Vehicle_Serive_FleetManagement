@@ -1,54 +1,60 @@
-using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using VehicleService.Application.DTOs;
 using VehicleService.Application.Interfaces;
+using VehicleService.Domain.Constants;
 using VehicleService.Domain.Entities;
 using VehicleService.Domain.Enums;
 using VehicleService.Domain.Exceptions;
 
 namespace VehicleService.Web.Controllers;
 
-[Authorize]
+[Authorize(Roles = $"{UserRoles.Customer},{UserRoles.Administrator}")]
 public class CustomerController : Controller
 {
     private readonly IVehicleService _vehicleService;
     private readonly IAppointmentService _appointmentService;
     private readonly IJobCardService _jobCardService;
+    private readonly IInspectionService _inspectionService;
     private readonly IEstimateService _estimateService;
     private readonly IInvoiceService _invoiceService;
     private readonly IPaymentService _paymentService;
     private readonly IWarrantyService _warrantyService;
     private readonly IRoadsideService _roadsideService;
     private readonly IReviewAndComplaintService _feedbackService;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IServiceCenterService _serviceCenterService;
+    private readonly IServiceCatalogService _serviceCatalogService;
     private readonly UserManager<ApplicationUser> _userManager;
 
     public CustomerController(
         IVehicleService vehicleService,
         IAppointmentService appointmentService,
         IJobCardService jobCardService,
+        IInspectionService inspectionService,
         IEstimateService estimateService,
         IInvoiceService invoiceService,
         IPaymentService paymentService,
         IWarrantyService warrantyService,
         IRoadsideService roadsideService,
         IReviewAndComplaintService feedbackService,
-        IUnitOfWork unitOfWork,
+        IServiceCenterService serviceCenterService,
+        IServiceCatalogService serviceCatalogService,
         UserManager<ApplicationUser> userManager)
     {
         _vehicleService = vehicleService;
         _appointmentService = appointmentService;
         _jobCardService = jobCardService;
+        _inspectionService = inspectionService;
         _estimateService = estimateService;
         _invoiceService = invoiceService;
         _paymentService = paymentService;
         _warrantyService = warrantyService;
         _roadsideService = roadsideService;
         _feedbackService = feedbackService;
-        _unitOfWork = unitOfWork;
+        _serviceCenterService = serviceCenterService;
+        _serviceCatalogService = serviceCatalogService;
         _userManager = userManager;
     }
 
@@ -228,9 +234,9 @@ public class CustomerController : Controller
             }
         }
 
-        var serviceTypes = await _unitOfWork.Repository<ServiceType>().FindAsync(s => s.IsActive);
-        var servicePackages = await _unitOfWork.Repository<ServicePackage>().FindAsync(p => p.IsActive);
-        var serviceCenters = await _unitOfWork.Repository<ServiceCenter>().FindAsync(c => c.IsActive);
+        var serviceTypes = await _serviceCatalogService.GetActiveServiceTypesAsync();
+        var servicePackages = await _serviceCatalogService.GetActivePackagesAsync();
+        var serviceCenters = await _serviceCenterService.GetActiveCentersAsync();
 
         int selectedVehicleId = vehicleId ?? (activeVehicles.FirstOrDefault()?.Id ?? 0);
 
@@ -327,9 +333,7 @@ public class CustomerController : Controller
         var jobCard = await _jobCardService.GetJobCardByIdAsync(id);
         if (jobCard == null) return NotFound();
 
-        var inspection = await _unitOfWork.Repository<VehicleInspection>().Query()
-            .Include(i => i.InspectionPhotos)
-            .FirstOrDefaultAsync(i => i.JobCardId == id);
+        var inspection = await _inspectionService.GetInspectionByJobCardIdAsync(id);
 
         var estimate = await _estimateService.GetEstimateByJobCardIdAsync(id);
         var invoice = await _invoiceService.GetInvoiceByJobCardIdAsync(id);

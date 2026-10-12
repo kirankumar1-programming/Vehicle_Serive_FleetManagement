@@ -26,6 +26,7 @@
     <ProjectReference Include="..\..\src\VehicleService.Application\VehicleService.Application.csproj" />
     <ProjectReference Include="..\..\src\VehicleService.Infrastructure\VehicleService.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\VehicleService.Persistence\VehicleService.Persistence.csproj" />
+    <ProjectReference Include="..\..\src\VehicleService.API\VehicleService.API.csproj" />
   </ItemGroup>
 
 </Project>

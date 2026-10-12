@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 using VehicleService.Domain.Enums;
 
 namespace VehicleService.Domain.Entities;
@@ -30,6 +30,7 @@ public class ApplicationUser : IdentityUser
     public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
     public virtual ICollection<CustomerReview> CustomerReviews { get; set; } = new List<CustomerReview>();
     public virtual ICollection<CustomerComplaint> CustomerComplaints { get; set; } = new List<CustomerComplaint>();
+    public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 }
 
 public class ApplicationRole : IdentityRole

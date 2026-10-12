@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using VehicleService.Domain.Enums;
 
 namespace VehicleService.Application.DTOs;
@@ -31,27 +32,58 @@ public class RoadsideRequestDto
 public class CreateRoadsideRequestDto
 {
     public string? CustomerId { get; set; }
+
+    [Range(1, int.MaxValue, ErrorMessage = "Valid Vehicle ID is required.")]
     public int VehicleId { get; set; }
+
     public RoadsideRequestType RequestType { get; set; } = RoadsideRequestType.Breakdown;
+
+    [Required(ErrorMessage = "Location address is required.")]
+    [StringLength(300, ErrorMessage = "Location address cannot exceed 300 characters.")]
     public string LocationAddress { get; set; } = string.Empty;
+
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
+
+    [Required(ErrorMessage = "Contact phone number is required.")]
+    [Phone(ErrorMessage = "Invalid phone number.")]
+    [StringLength(20, ErrorMessage = "Contact phone cannot exceed 20 characters.")]
     public string ContactPhone { get; set; } = string.Empty;
+
+    [StringLength(1000, ErrorMessage = "Issue description cannot exceed 1000 characters.")]
     public string? IssueDescription { get; set; }
 }
 
 public class UpdateRoadsideRequestDto
 {
+    [Range(1, int.MaxValue, ErrorMessage = "Valid Request ID is required.")]
     public int RequestId { get; set; }
+
     public RoadsideRequestType? RequestType { get; set; }
     public RoadsideStatus Status { get; set; }
+
+    [StringLength(300, ErrorMessage = "Location address cannot exceed 300 characters.")]
     public string LocationAddress { get; set; } = string.Empty;
+
+    [Phone(ErrorMessage = "Invalid phone number.")]
+    [StringLength(20, ErrorMessage = "Contact phone cannot exceed 20 characters.")]
     public string ContactPhone { get; set; } = string.Empty;
+
+    [StringLength(1000, ErrorMessage = "Issue description cannot exceed 1000 characters.")]
     public string? IssueDescription { get; set; }
+
+    [StringLength(100)]
     public string? AssignedTechnicianName { get; set; }
+
+    [StringLength(20)]
     public string? AssignedTechnicianPhone { get; set; }
+
+    [StringLength(30)]
     public string? TowTruckPlate { get; set; }
+
     public DateTime? EstimatedArrivalTime { get; set; }
+
+    [StringLength(1000)]
     public string? ResolutionNotes { get; set; }
 }
 

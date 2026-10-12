@@ -1,4 +1,5 @@
-﻿using VehicleService.Domain.Enums;
+using System.ComponentModel.DataAnnotations;
+using VehicleService.Domain.Enums;
 
 namespace VehicleService.Application.DTOs;
 
@@ -45,14 +46,30 @@ public class InvoiceItemDto
 
 public class PaymentRequestDto
 {
+    [Range(1, int.MaxValue, ErrorMessage = "Valid Invoice ID is required.")]
     public int InvoiceId { get; set; }
+
+    [Range(0.01, 10000000.00, ErrorMessage = "Payment amount must be greater than zero.")]
     public decimal Amount { get; set; }
+
     public PaymentMethod Method { get; set; } = PaymentMethod.CreditCard;
+
+    [StringLength(30, ErrorMessage = "Card number cannot exceed 30 characters.")]
     public string? CardNumber { get; set; }
+
+    [StringLength(100, ErrorMessage = "Cardholder name cannot exceed 100 characters.")]
     public string? CardHolderName { get; set; }
+
+    [StringLength(10, ErrorMessage = "Expiry date cannot exceed 10 characters.")]
     public string? ExpiryDate { get; set; }
+
+    [StringLength(5, ErrorMessage = "CVV cannot exceed 5 characters.")]
     public string? CVV { get; set; }
+
+    [StringLength(100, ErrorMessage = "UPI ID cannot exceed 100 characters.")]
     public string? UpiId { get; set; }
+
+    [StringLength(100, ErrorMessage = "Transaction reference cannot exceed 100 characters.")]
     public string? TransactionReference { get; set; } // Optional client idempotency key
 }
 
