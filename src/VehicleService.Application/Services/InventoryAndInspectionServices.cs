@@ -10,11 +10,14 @@ namespace VehicleService.Application.Services;
 public class InventoryService : IInventoryService
 {
     private readonly IUnitOfWork _unitOfWork;
-    private static readonly object _stockLock = new();
+    private readonly VehicleService.Application.Common.IConcurrencyCoordinator _concurrencyCoordinator;
 
-    public InventoryService(IUnitOfWork unitOfWork)
+    public InventoryService(
+        IUnitOfWork unitOfWork,
+        VehicleService.Application.Common.IConcurrencyCoordinator? concurrencyCoordinator = null)
     {
         _unitOfWork = unitOfWork;
+        _concurrencyCoordinator = concurrencyCoordinator ?? new VehicleService.Application.Common.KeyedLockCoordinator();
     }
 
     public async Task<IReadOnlyList<InventoryPartDto>> GetAllPartsAsync(int? centerId = null, string? search = null, string? category = null)
@@ -159,9 +162,9 @@ public class InventoryService : IInventoryService
     {
         if (quantity <= 0) return false;
 
-        lock (_stockLock)
+        using (await _concurrencyCoordinator.LockAsync($"inventory:part:{partId}"))
         {
-            var part = _unitOfWork.Repository<InventoryPart>().Query().FirstOrDefault(p => p.Id == partId);
+            var part = await _unitOfWork.Repository<InventoryPart>().Query().FirstOrDefaultAsync(p => p.Id == partId);
             if (part == null) throw new DomainException("Inventory part not found.");
 
             if (part.AvailableQuantity < quantity)
@@ -171,7 +174,7 @@ public class InventoryService : IInventoryService
 
             part.AvailableQuantity -= quantity;
             part.ReservedQuantity += quantity;
-            _unitOfWork.Repository<InventoryPart>().UpdateAsync(part).GetAwaiter().GetResult();
+            await _unitOfWork.Repository<InventoryPart>().UpdateAsync(part);
 
             var reservation = new PartReservation
             {
@@ -181,7 +184,7 @@ public class InventoryService : IInventoryService
                 IsReleased = false
             };
 
-            _unitOfWork.Repository<PartReservation>().AddAsync(reservation).GetAwaiter().GetResult();
+            await _unitOfWork.Repository<PartReservation>().AddAsync(reservation);
 
             var txn = new InventoryTransaction
             {
@@ -195,9 +198,21 @@ public class InventoryService : IInventoryService
                 ReferenceNumber = $"APT-{appointmentId}",
                 Notes = $"Stock reserved for Appointment #{appointmentId}"
             };
-            _unitOfWork.Repository<InventoryTransaction>().AddAsync(txn).GetAwaiter().GetResult();
+            await _unitOfWork.Repository<InventoryTransaction>().AddAsync(txn);
 
-            _unitOfWork.SaveChangesAsync().GetAwaiter().GetResult();
+            try
+            {
+                await _unitOfWork.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                var refreshed = await _unitOfWork.Repository<InventoryPart>().Query().AsNoTracking().FirstOrDefaultAsync(p => p.Id == partId);
+                if (refreshed == null || refreshed.AvailableQuantity < quantity)
+                {
+                    throw new InsufficientStockException($"Cannot reserve part '{part.Name}' ({part.PartNumber}). Requested: {quantity}, Available: {refreshed?.AvailableQuantity ?? 0}. Stock cannot be negative.");
+                }
+                throw;
+            }
 
             return true;
         }
@@ -205,23 +220,23 @@ public class InventoryService : IInventoryService
 
     public async Task<bool> ReleaseReservationAsync(int reservationId)
     {
-        lock (_stockLock)
-        {
-            var reservation = _unitOfWork.Repository<PartReservation>().Query().FirstOrDefault(r => r.Id == reservationId);
-            if (reservation == null || reservation.IsReleased || reservation.IsConsumed) return false;
+        var reservation = await _unitOfWork.Repository<PartReservation>().Query().FirstOrDefaultAsync(r => r.Id == reservationId);
+        if (reservation == null || reservation.IsReleased || reservation.IsConsumed) return false;
 
-            var part = _unitOfWork.Repository<InventoryPart>().Query().FirstOrDefault(p => p.Id == reservation.InventoryPartId);
+        using (await _concurrencyCoordinator.LockAsync($"inventory:part:{reservation.InventoryPartId}"))
+        {
+            var part = await _unitOfWork.Repository<InventoryPart>().Query().FirstOrDefaultAsync(p => p.Id == reservation.InventoryPartId);
             if (part != null)
             {
                 part.AvailableQuantity += reservation.Quantity;
                 part.ReservedQuantity = Math.Max(0, part.ReservedQuantity - reservation.Quantity);
-                _unitOfWork.Repository<InventoryPart>().UpdateAsync(part).GetAwaiter().GetResult();
+                await _unitOfWork.Repository<InventoryPart>().UpdateAsync(part);
             }
 
             reservation.IsReleased = true;
             reservation.ReleasedAt = DateTime.UtcNow;
-            _unitOfWork.Repository<PartReservation>().UpdateAsync(reservation).GetAwaiter().GetResult();
-            _unitOfWork.SaveChangesAsync().GetAwaiter().GetResult();
+            await _unitOfWork.Repository<PartReservation>().UpdateAsync(reservation);
+            await _unitOfWork.SaveChangesAsync();
 
             return true;
         }
@@ -232,15 +247,15 @@ public class InventoryService : IInventoryService
     {
         if (quantity <= 0) return false;
 
-        lock (_stockLock)
+        using (await _concurrencyCoordinator.LockAsync($"inventory:part:{partId}"))
         {
-            var part = _unitOfWork.Repository<InventoryPart>().Query().FirstOrDefault(p => p.Id == partId);
+            var part = await _unitOfWork.Repository<InventoryPart>().Query().FirstOrDefaultAsync(p => p.Id == partId);
             if (part == null) throw new DomainException("Part not found.");
 
             // Check if there was an active reservation for this appointment
-            var jobCard = _unitOfWork.Repository<ServiceJobCard>().Query()
+            var jobCard = await _unitOfWork.Repository<ServiceJobCard>().Query()
                 .Include(j => j.Appointment)
-                .FirstOrDefault(j => j.Id == jobCardId);
+                .FirstOrDefaultAsync(j => j.Id == jobCardId);
 
             if (jobCard != null && (jobCard.Status == AppointmentStatus.Cancelled || jobCard.Appointment?.Status == AppointmentStatus.Cancelled))
             {
@@ -255,8 +270,8 @@ public class InventoryService : IInventoryService
 
             if (jobCard != null)
             {
-                activeReservation = _unitOfWork.Repository<PartReservation>().Query()
-                    .FirstOrDefault(r => r.AppointmentId == jobCard.AppointmentId && r.InventoryPartId == partId && !r.IsReleased && !r.IsConsumed);
+                activeReservation = await _unitOfWork.Repository<PartReservation>().Query()
+                    .FirstOrDefaultAsync(r => r.AppointmentId == jobCard.AppointmentId && r.InventoryPartId == partId && !r.IsReleased && !r.IsConsumed);
             }
 
             int beforeQty = part.AvailableQuantity + part.ReservedQuantity;
@@ -267,7 +282,7 @@ public class InventoryService : IInventoryService
                 part.ReservedQuantity = Math.Max(0, part.ReservedQuantity - quantity);
                 activeReservation.IsConsumed = true;
                 activeReservation.ConsumedAt = DateTime.UtcNow;
-                _unitOfWork.Repository<PartReservation>().UpdateAsync(activeReservation).GetAwaiter().GetResult();
+                await _unitOfWork.Repository<PartReservation>().UpdateAsync(activeReservation);
             }
             else
             {
@@ -279,7 +294,7 @@ public class InventoryService : IInventoryService
                 part.AvailableQuantity -= quantity;
             }
 
-            _unitOfWork.Repository<InventoryPart>().UpdateAsync(part).GetAwaiter().GetResult();
+            await _unitOfWork.Repository<InventoryPart>().UpdateAsync(part);
 
             // Record consumption in JobCard
             var consumption = new PartConsumption
@@ -292,7 +307,7 @@ public class InventoryService : IInventoryService
                 LoggedByUserId = performedByUserId,
                 ConsumedAt = DateTime.UtcNow
             };
-            _unitOfWork.Repository<PartConsumption>().AddAsync(consumption).GetAwaiter().GetResult();
+            await _unitOfWork.Repository<PartConsumption>().AddAsync(consumption);
 
             // Record inventory movement transaction
             int afterQty = part.AvailableQuantity + part.ReservedQuantity;
@@ -309,18 +324,31 @@ public class InventoryService : IInventoryService
                 PerformedByUserId = performedByUserId,
                 Notes = $"Consumed for repair Job Card {jobCard?.JobCardNumber}"
             };
-            _unitOfWork.Repository<InventoryTransaction>().AddAsync(transaction).GetAwaiter().GetResult();
+            await _unitOfWork.Repository<InventoryTransaction>().AddAsync(transaction);
 
-            _unitOfWork.SaveChangesAsync().GetAwaiter().GetResult();
+            try
+            {
+                await _unitOfWork.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                var refreshed = await _unitOfWork.Repository<InventoryPart>().Query().AsNoTracking().FirstOrDefaultAsync(p => p.Id == partId);
+                if (refreshed == null || refreshed.AvailableQuantity < quantity)
+                {
+                    throw new InsufficientStockException($"Cannot consume part '{part.Name}'. Requested: {quantity}, Available in stock: {refreshed?.AvailableQuantity ?? 0}. Inventory must not become negative.");
+                }
+                throw;
+            }
+
             return true;
         }
     }
 
     public async Task<bool> AdjustStockAsync(AdjustStockDto dto)
     {
-        lock (_stockLock)
+        using (await _concurrencyCoordinator.LockAsync($"inventory:part:{dto.PartId}"))
         {
-            var part = _unitOfWork.Repository<InventoryPart>().Query().FirstOrDefault(p => p.Id == dto.PartId);
+            var part = await _unitOfWork.Repository<InventoryPart>().Query().FirstOrDefaultAsync(p => p.Id == dto.PartId);
             if (part == null) throw new DomainException("Part not found.");
 
             int before = part.AvailableQuantity;
@@ -346,13 +374,11 @@ public class InventoryService : IInventoryService
                     break;
 
                 case InventoryTransactionType.Adjustment:
-                    // Direct set
                     part.AvailableQuantity = Math.Max(0, dto.Quantity);
                     after = part.AvailableQuantity;
                     break;
 
                 case InventoryTransactionType.ReservationRelease:
-                    // Release reserved quantity back to available stock
                     int releaseQty = Math.Min(part.ReservedQuantity, dto.Quantity);
                     part.ReservedQuantity -= releaseQty;
                     part.AvailableQuantity += releaseQty;
@@ -360,7 +386,7 @@ public class InventoryService : IInventoryService
                     break;
             }
 
-            _unitOfWork.Repository<InventoryPart>().UpdateAsync(part).GetAwaiter().GetResult();
+            await _unitOfWork.Repository<InventoryPart>().UpdateAsync(part);
 
             var txn = new InventoryTransaction
             {
@@ -376,32 +402,30 @@ public class InventoryService : IInventoryService
                 Notes = dto.Notes
             };
 
-            _unitOfWork.Repository<InventoryTransaction>().AddAsync(txn).GetAwaiter().GetResult();
-            _unitOfWork.SaveChangesAsync().GetAwaiter().GetResult();
+            await _unitOfWork.Repository<InventoryTransaction>().AddAsync(txn);
+            await _unitOfWork.SaveChangesAsync();
             return true;
         }
     }
 
     public async Task<int> ReconcileReservedStockAsync()
     {
-        lock (_stockLock)
+        using (await _concurrencyCoordinator.LockAsync("inventory:reconcile"))
         {
-            var parts = _unitOfWork.Repository<InventoryPart>().Query().ToList();
+            var parts = await _unitOfWork.Repository<InventoryPart>().Query().ToListAsync();
             int reconciledCount = 0;
 
             foreach (var part in parts)
             {
-                // Find sum of all active, unreleased, unconsumed reservations for this part
-                int activeReservationsSum = _unitOfWork.Repository<PartReservation>().Query()
+                int activeReservationsSum = await _unitOfWork.Repository<PartReservation>().Query()
                     .Where(r => r.InventoryPartId == part.Id && !r.IsReleased && !r.IsConsumed)
-                    .Sum(r => r.Quantity);
+                    .SumAsync(r => r.Quantity);
 
                 if (part.ReservedQuantity != activeReservationsSum)
                 {
                     int beforeAvail = part.AvailableQuantity;
                     int beforeRes = part.ReservedQuantity;
 
-                    // If reserved was higher than active reservations, release the orphaned difference back to available stock
                     if (part.ReservedQuantity > activeReservationsSum)
                     {
                         int orphanDiff = part.ReservedQuantity - activeReservationsSum;
@@ -409,7 +433,7 @@ public class InventoryService : IInventoryService
                     }
                     part.ReservedQuantity = activeReservationsSum;
 
-                    _unitOfWork.Repository<InventoryPart>().UpdateAsync(part).GetAwaiter().GetResult();
+                    await _unitOfWork.Repository<InventoryPart>().UpdateAsync(part);
 
                     var txn = new InventoryTransaction
                     {
@@ -423,14 +447,15 @@ public class InventoryService : IInventoryService
                         ReferenceNumber = "RECONCILE",
                         Notes = $"Stock reconciliation: Aligned reserved quantity from {beforeRes} to {activeReservationsSum} based on active reservations."
                     };
-                    _unitOfWork.Repository<InventoryTransaction>().AddAsync(txn).GetAwaiter().GetResult();
+
+                    await _unitOfWork.Repository<InventoryTransaction>().AddAsync(txn);
                     reconciledCount++;
                 }
             }
 
             if (reconciledCount > 0)
             {
-                _unitOfWork.SaveChangesAsync().GetAwaiter().GetResult();
+                await _unitOfWork.SaveChangesAsync();
             }
 
             return reconciledCount;

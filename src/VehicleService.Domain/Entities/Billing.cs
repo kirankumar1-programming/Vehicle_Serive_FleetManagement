@@ -1,4 +1,4 @@
-﻿using VehicleService.Domain.Common;
+using VehicleService.Domain.Common;
 using VehicleService.Domain.Enums;
 
 namespace VehicleService.Domain.Entities;
@@ -30,6 +30,9 @@ public class Invoice : BaseEntity
 
     public PaymentStatus Status { get; set; } = PaymentStatus.Pending;
     public string? Notes { get; set; }
+
+    // Concurrency Token
+    public byte[]? RowVersion { get; set; }
 
     public virtual ICollection<InvoiceItem> Items { get; set; } = new List<InvoiceItem>();
     public virtual ICollection<PaymentTransaction> Payments { get; set; } = new List<PaymentTransaction>();

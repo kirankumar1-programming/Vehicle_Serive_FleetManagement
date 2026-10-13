@@ -1,10 +1,12 @@
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using VehicleService.API.HealthChecks;
 using VehicleService.API.Middleware;
 using VehicleService.Application;
 using VehicleService.Domain.Constants;
@@ -16,11 +18,16 @@ using VehicleService.Persistence.Seed;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Data Access Layer (Persistence)
+// 1. Production Structured Logging Configuration
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+
+// 2. Data Access Layer (Persistence)
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=VehicleService_Api.db";
 builder.Services.AddPersistenceServices(builder.Configuration, connectionString);
 
-// 2. Identity with Robust Security & Lockout Settings
+// 3. Identity with Robust Security & Lockout Settings
 builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 {
     options.Password.RequireDigit = true;
@@ -38,13 +45,13 @@ builder.Services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
-// 3. Business Logic Layer (Application)
+// 4. Business Logic Layer (Application)
 builder.Services.AddApplicationServices();
 
-// 4. Infrastructure Layer
+// 5. Infrastructure Layer
 builder.Services.AddInfrastructureServices(builder.Configuration);
 
-// 5. REST API Authentication (JWT)
+// 6. REST API Authentication (JWT)
 var jwtSecret = builder.Configuration["Jwt:Secret"] ?? "VehicleServiceFleetManagementSecureKey2026!#$LongEnoughForHmacSha256Signature";
 builder.Services.AddAuthentication(options =>
 {
@@ -68,7 +75,7 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// 6. Role-Based Authorization Policies
+// 7. Role-Based Authorization Policies
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("RequireAdministrator", policy => policy.RequireRole(UserRoles.Administrator));
@@ -80,7 +87,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("RequireCustomerOrAdmin", policy => policy.RequireRole(UserRoles.Administrator, UserRoles.Customer));
 });
 
-// 7. Rate Limiter for Authentication Endpoints (Brute-force protection)
+// 8. Rate Limiter for Authentication Endpoints (Brute-force protection)
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -96,10 +103,16 @@ builder.Services.AddRateLimiter(options =>
             }));
 });
 
+// 9. Health Checks Registration
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("Database", tags: new[] { "ready", "db" })
+    .AddCheck<SystemMemoryHealthCheck>("Memory", tags: new[] { "ready", "memory" })
+    .AddCheck<DiskStorageHealthCheck>("Storage", tags: new[] { "ready", "storage" });
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-// 8. Swagger with JWT Bearer Authentication definition
+// 10. Swagger with JWT Bearer Authentication definition
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
@@ -154,8 +167,19 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-// Security Middleware Pipeline
+// Production Middleware Pipeline:
+// 1. Centralized Global Exception Handling
+app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
+
+// 2. Correlation Tracking & Logging Scope
+app.UseMiddleware<CorrelationIdMiddleware>();
+
+// 3. HTTP Request & Response Telemetry
+app.UseMiddleware<RequestLoggingMiddleware>();
+
+// 4. Security Headers
 app.UseMiddleware<SecurityHeadersMiddleware>();
+
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
 app.UseRateLimiter();
@@ -163,6 +187,25 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// 5. Health Check Endpoints
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = HealthCheckResponseWriter.WriteDetailedJsonResponse
+});
+
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = HealthCheckResponseWriter.WriteDetailedJsonResponse
+});
+
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = _ => false
+});
+
 app.MapControllers();
 
 app.Run();
+
+public partial class Program { }

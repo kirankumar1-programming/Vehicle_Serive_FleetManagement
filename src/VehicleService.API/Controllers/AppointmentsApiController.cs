@@ -13,10 +13,12 @@ namespace VehicleService.API.Controllers;
 public class AppointmentsApiController : ControllerBase
 {
     private readonly IAppointmentService _appointmentService;
+    private readonly ILogger<AppointmentsApiController> _logger;
 
-    public AppointmentsApiController(IAppointmentService appointmentService)
+    public AppointmentsApiController(IAppointmentService appointmentService, ILogger<AppointmentsApiController> logger)
     {
         _appointmentService = appointmentService;
+        _logger = logger;
     }
 
     private string CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
@@ -71,6 +73,8 @@ public class AppointmentsApiController : ControllerBase
         }
 
         var result = await _appointmentService.BookAppointmentAsync(dto);
+        _logger.LogInformation("Appointment {AppointmentNumber} successfully booked for Customer {CustomerId} at Service Center {CenterId}",
+            result.AppointmentNumber, result.CustomerId, result.ServiceCenterId);
         return CreatedAtAction(nameof(GetAppointmentById), new { id = result.Id }, result);
     }
 
@@ -92,6 +96,7 @@ public class AppointmentsApiController : ControllerBase
         if (!success)
             return BadRequest("Could not cancel appointment.");
 
+        _logger.LogInformation("Appointment {Id} cancelled by {User}. Reason: {Reason}", id, User.Identity?.Name ?? CurrentUserId, reason);
         return NoContent();
     }
 }

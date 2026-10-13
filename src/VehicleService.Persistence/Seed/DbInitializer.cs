@@ -24,6 +24,11 @@ public static class DbInitializer
             }
             catch { /* Column may already exist */ }
 
+            try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE ServiceJobCards ADD COLUMN RowVersion BLOB;"); } catch { }
+            try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE Invoices ADD COLUMN RowVersion BLOB;"); } catch { }
+            try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE ServiceAppointments ADD COLUMN RowVersion BLOB;"); } catch { }
+            try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE InventoryParts ADD COLUMN RowVersion BLOB;"); } catch { }
+
             try
             {
                 await context.Database.ExecuteSqlRawAsync(@"

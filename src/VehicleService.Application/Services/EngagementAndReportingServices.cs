@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using System.Text;
 using VehicleService.Application.DTOs;
 using VehicleService.Application.Interfaces;
@@ -388,19 +388,66 @@ public class AuditService : IAuditService
             .Take(take)
             .ToListAsync();
 
-        return list.Select(l => new AuditLogDto
-        {
-            Id = l.Id,
-            UserId = l.UserId,
-            UserName = l.UserName,
-            Action = l.Action,
-            EntityName = l.EntityName,
-            EntityId = l.EntityId,
-            OldValues = l.OldValues,
-            NewValues = l.NewValues,
-            Timestamp = l.Timestamp
-        }).ToList();
+        return list.Select(MapToDto).ToList();
     }
+
+    public async Task<PagedResult<AuditLogDto>> GetFilteredLogsAsync(AuditLogFilterDto filter)
+    {
+        var query = _unitOfWork.Repository<AuditLog>().Query();
+
+        if (!string.IsNullOrWhiteSpace(filter.EntityName))
+            query = query.Where(l => l.EntityName == filter.EntityName);
+
+        if (!string.IsNullOrWhiteSpace(filter.Action))
+            query = query.Where(l => l.Action == filter.Action);
+
+        if (!string.IsNullOrWhiteSpace(filter.UserId))
+            query = query.Where(l => l.UserId == filter.UserId);
+
+        if (filter.StartDate.HasValue)
+            query = query.Where(l => l.Timestamp >= filter.StartDate.Value);
+
+        if (filter.EndDate.HasValue)
+            query = query.Where(l => l.Timestamp <= filter.EndDate.Value);
+
+        var totalCount = await query.CountAsync();
+        var page = filter.Page > 0 ? filter.Page : 1;
+        var pageSize = filter.PageSize > 0 ? Math.Min(filter.PageSize, 100) : 50;
+
+        var items = await query
+            .OrderByDescending(l => l.Timestamp)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return new PagedResult<AuditLogDto>
+        {
+            Items = items.Select(MapToDto).ToList(),
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
+    }
+
+    public async Task<AuditLogDto?> GetLogByIdAsync(int id)
+    {
+        var log = await _unitOfWork.Repository<AuditLog>().GetByIdAsync(id);
+        return log == null ? null : MapToDto(log);
+    }
+
+    private static AuditLogDto MapToDto(AuditLog l) => new()
+    {
+        Id = l.Id,
+        UserId = l.UserId,
+        UserName = l.UserName,
+        Action = l.Action,
+        EntityName = l.EntityName,
+        EntityId = l.EntityId,
+        OldValues = l.OldValues,
+        NewValues = l.NewValues,
+        IpAddress = l.IpAddress,
+        Timestamp = l.Timestamp
+    };
 }
 
 public class NotificationService : INotificationService

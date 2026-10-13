@@ -11,12 +11,19 @@ public class AppointmentService : IAppointmentService
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
-    private static readonly object _bookingLock = new();
+    private readonly VehicleService.Application.Common.IConcurrencyCoordinator _concurrencyCoordinator;
+    private readonly IInventoryService _inventoryService;
 
-    public AppointmentService(IUnitOfWork unitOfWork, INotificationService notificationService)
+    public AppointmentService(
+        IUnitOfWork unitOfWork,
+        INotificationService notificationService,
+        VehicleService.Application.Common.IConcurrencyCoordinator? concurrencyCoordinator = null,
+        IInventoryService? inventoryService = null)
     {
         _unitOfWork = unitOfWork;
         _notificationService = notificationService;
+        _concurrencyCoordinator = concurrencyCoordinator ?? new VehicleService.Application.Common.KeyedLockCoordinator();
+        _inventoryService = inventoryService ?? new InventoryService(_unitOfWork, _concurrencyCoordinator);
     }
 
     public async Task<IReadOnlyList<AppointmentDto>> GetCustomerAppointmentsAsync(string customerId)
@@ -119,18 +126,19 @@ public class AppointmentService : IAppointmentService
     public async Task<AppointmentDto> BookAppointmentAsync(BookAppointmentDto dto)
     {
         var targetDate = dto.AppointmentDate.Date;
+        var lockKey = $"booking:{dto.ServiceCenterId}:{targetDate:yyyy-MM-dd}:{dto.TimeSlot}";
 
-        lock (_bookingLock)
+        using (await _concurrencyCoordinator.LockAsync(lockKey))
         {
             // 1. Check if specific bay is chosen and already booked for this slot
             if (dto.ServiceBayId.HasValue)
             {
-                bool isBayBooked = _unitOfWork.Repository<ServiceAppointment>().Query()
-                    .Any(a => a.ServiceCenterId == dto.ServiceCenterId &&
-                              a.ServiceBayId == dto.ServiceBayId.Value &&
-                              a.AppointmentDate.Date == targetDate &&
-                              a.TimeSlot == dto.TimeSlot &&
-                              a.Status != AppointmentStatus.Cancelled);
+                bool isBayBooked = await _unitOfWork.Repository<ServiceAppointment>().Query()
+                    .AnyAsync(a => a.ServiceCenterId == dto.ServiceCenterId &&
+                                   a.ServiceBayId == dto.ServiceBayId.Value &&
+                                   a.AppointmentDate.Date == targetDate &&
+                                   a.TimeSlot == dto.TimeSlot &&
+                                   a.Status != AppointmentStatus.Cancelled);
 
                 if (isBayBooked)
                 {
@@ -139,11 +147,11 @@ public class AppointmentService : IAppointmentService
             }
 
             // 2. Check total center capacity for this date and time slot
-            var totalActiveBays = _unitOfWork.Repository<ServiceBay>().Query()
-                .Count(b => b.ServiceCenterId == dto.ServiceCenterId && b.IsActive && b.Status != BayStatus.Maintenance);
+            var totalActiveBays = await _unitOfWork.Repository<ServiceBay>().Query()
+                .CountAsync(b => b.ServiceCenterId == dto.ServiceCenterId && b.IsActive && b.Status != BayStatus.Maintenance);
 
-            var existingSlotBookings = _unitOfWork.Repository<ServiceAppointment>().Query()
-                .Count(a => a.ServiceCenterId == dto.ServiceCenterId &&
+            var existingSlotBookings = await _unitOfWork.Repository<ServiceAppointment>().Query()
+                .CountAsync(a => a.ServiceCenterId == dto.ServiceCenterId &&
                             a.AppointmentDate.Date == targetDate &&
                             a.TimeSlot == dto.TimeSlot &&
                             a.Status != AppointmentStatus.Cancelled);
@@ -154,8 +162,8 @@ public class AppointmentService : IAppointmentService
             }
 
             // 3. Prevent duplicate active booking for the exact same vehicle on the same date
-            bool vehicleAlreadyBooked = _unitOfWork.Repository<ServiceAppointment>().Query()
-                .Any(a => a.VehicleId == dto.VehicleId &&
+            bool vehicleAlreadyBooked = await _unitOfWork.Repository<ServiceAppointment>().Query()
+                .AnyAsync(a => a.VehicleId == dto.VehicleId &&
                           a.AppointmentDate.Date == targetDate &&
                           a.Status != AppointmentStatus.Cancelled &&
                           a.Status != AppointmentStatus.Completed);
@@ -164,92 +172,97 @@ public class AppointmentService : IAppointmentService
             {
                 throw new DoubleBookingException("This vehicle already has an active appointment scheduled for the selected date.");
             }
-        }
 
-        // Auto-assign available bay if not explicitly selected
-        int? assignedBayId = dto.ServiceBayId;
-        if (!assignedBayId.HasValue)
-        {
-            var bookedBayIds = await _unitOfWork.Repository<ServiceAppointment>().Query()
-                .Where(a => a.ServiceCenterId == dto.ServiceCenterId &&
-                            a.AppointmentDate.Date == targetDate &&
-                            a.TimeSlot == dto.TimeSlot &&
-                            a.ServiceBayId.HasValue &&
-                            a.Status != AppointmentStatus.Cancelled)
-                .Select(a => a.ServiceBayId!.Value)
-                .ToListAsync();
-
-            var availableBay = await _unitOfWork.Repository<ServiceBay>().Query()
-                .FirstOrDefaultAsync(b => b.ServiceCenterId == dto.ServiceCenterId &&
-                                          b.IsActive &&
-                                          b.Status != BayStatus.Maintenance &&
-                                          !bookedBayIds.Contains(b.Id));
-
-            if (availableBay != null)
+            // 4. Auto-assign available bay if not explicitly selected
+            int? assignedBayId = dto.ServiceBayId;
+            if (!assignedBayId.HasValue)
             {
+                var bookedBayIds = await _unitOfWork.Repository<ServiceAppointment>().Query()
+                    .Where(a => a.ServiceCenterId == dto.ServiceCenterId &&
+                                a.AppointmentDate.Date == targetDate &&
+                                a.TimeSlot == dto.TimeSlot &&
+                                a.ServiceBayId.HasValue &&
+                                a.Status != AppointmentStatus.Cancelled)
+                    .Select(a => a.ServiceBayId!.Value)
+                    .ToListAsync();
+
+                var availableBay = await _unitOfWork.Repository<ServiceBay>().Query()
+                    .FirstOrDefaultAsync(b => b.ServiceCenterId == dto.ServiceCenterId &&
+                                              b.IsActive &&
+                                              b.Status != BayStatus.Maintenance &&
+                                              !bookedBayIds.Contains(b.Id));
+
+                if (availableBay == null)
+                {
+                    throw new DoubleBookingException($"All service bays are occupied at this center for {targetDate:yyyy-MM-dd} during {dto.TimeSlot}.");
+                }
+
                 assignedBayId = availableBay.Id;
             }
-        }
 
-        var appointmentNumber = $"APT-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..5].ToUpper()}";
+            var appointmentNumber = $"APT-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..5].ToUpper()}";
 
-        var appointment = new ServiceAppointment
-        {
-            AppointmentNumber = appointmentNumber,
-            VehicleId = dto.VehicleId,
-            CustomerId = dto.CustomerId ?? string.Empty,
-            ServiceCenterId = dto.ServiceCenterId,
-            ServiceBayId = assignedBayId,
-            ServiceTypeId = dto.ServiceTypeId,
-            ServicePackageId = dto.ServicePackageId,
-            AppointmentDate = targetDate,
-            TimeSlot = dto.TimeSlot,
-            Status = AppointmentStatus.Confirmed,
-            Priority = dto.Priority,
-            CustomerNotes = dto.CustomerNotes,
-            RequiresPickupDrop = dto.RequiresPickupDrop,
-            PickupAddress = dto.PickupAddress
-        };
-
-        await _unitOfWork.Repository<ServiceAppointment>().AddAsync(appointment);
-        await _unitOfWork.SaveChangesAsync();
-
-        // Reserve parts if required for chosen service
-        if (dto.RequiredPartIds != null && dto.RequiredPartIds.Count > 0)
-        {
-            foreach (var partId in dto.RequiredPartIds)
+            var appointment = new ServiceAppointment
             {
-                var part = await _unitOfWork.Repository<InventoryPart>().GetByIdAsync(partId);
-                if (part != null && part.AvailableQuantity > 0)
-                {
-                    part.AvailableQuantity -= 1;
-                    part.ReservedQuantity += 1;
-                    await _unitOfWork.Repository<InventoryPart>().UpdateAsync(part);
+                AppointmentNumber = appointmentNumber,
+                VehicleId = dto.VehicleId,
+                CustomerId = dto.CustomerId ?? string.Empty,
+                ServiceCenterId = dto.ServiceCenterId,
+                ServiceBayId = assignedBayId,
+                ServiceTypeId = dto.ServiceTypeId,
+                ServicePackageId = dto.ServicePackageId,
+                AppointmentDate = targetDate,
+                TimeSlot = dto.TimeSlot,
+                Status = AppointmentStatus.Confirmed,
+                Priority = dto.Priority,
+                CustomerNotes = dto.CustomerNotes,
+                RequiresPickupDrop = dto.RequiresPickupDrop,
+                PickupAddress = dto.PickupAddress
+            };
 
-                    await _unitOfWork.Repository<PartReservation>().AddAsync(new PartReservation
+            try
+            {
+                await _unitOfWork.Repository<ServiceAppointment>().AddAsync(appointment);
+                await _unitOfWork.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                throw new DoubleBookingException("A concurrency conflict occurred while reserving your service appointment slot. Please try again.", ex);
+            }
+            catch (DbUpdateException ex)
+            {
+                throw new DoubleBookingException("A double booking conflict occurred for the selected bay or time slot. Please choose another slot.", ex);
+            }
+
+            // Reserve parts if required for chosen service using InventoryService
+            if (dto.RequiredPartIds != null && dto.RequiredPartIds.Count > 0)
+            {
+                foreach (var partId in dto.RequiredPartIds)
+                {
+                    try
                     {
-                        InventoryPartId = partId,
-                        AppointmentId = appointment.Id,
-                        Quantity = 1,
-                        IsReleased = false
-                    });
+                        await _inventoryService.ReservePartAsync(partId, 1, appointment.Id);
+                    }
+                    catch (InsufficientStockException)
+                    {
+                        // Part reservation skipped if insufficient stock
+                    }
                 }
             }
-            await _unitOfWork.SaveChangesAsync();
-        }
 
-        // Notify Customer
-        if (!string.IsNullOrEmpty(dto.CustomerId))
-        {
-            await _notificationService.SendNotificationAsync(
-                dto.CustomerId,
-                "Appointment Confirmed",
-                $"Your service appointment {appointmentNumber} is confirmed for {targetDate:MMM dd, yyyy} ({dto.TimeSlot}).",
-                NotificationType.Appointment,
-                $"/Customer/Appointments");
-        }
+            // Notify Customer
+            if (!string.IsNullOrEmpty(dto.CustomerId))
+            {
+                await _notificationService.SendNotificationAsync(
+                    dto.CustomerId,
+                    "Appointment Confirmed",
+                    $"Your service appointment {appointmentNumber} is confirmed for {targetDate:MMM dd, yyyy} ({dto.TimeSlot}).",
+                    NotificationType.Appointment,
+                    $"/Customer/Appointments");
+            }
 
-        return (await GetAppointmentByIdAsync(appointment.Id))!;
+            return (await GetAppointmentByIdAsync(appointment.Id))!;
+        }
     }
 
     // SCENARIO 5: Service Cancellation (Releases Slot & Reserved Parts)

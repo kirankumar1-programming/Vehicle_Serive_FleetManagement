@@ -141,5 +141,29 @@ public class AuditLogDto
     public string? EntityId { get; set; }
     public string? OldValues { get; set; }
     public string? NewValues { get; set; }
+    public string? IpAddress { get; set; }
     public DateTime Timestamp { get; set; }
 }
+
+public class AuditLogFilterDto
+{
+    public string? EntityName { get; set; }
+    public string? Action { get; set; }
+    public string? UserId { get; set; }
+    public DateTime? StartDate { get; set; }
+    public DateTime? EndDate { get; set; }
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 50;
+}
+
+public class PagedResult<T>
+{
+    public IReadOnlyList<T> Items { get; set; } = new List<T>();
+    public int TotalCount { get; set; }
+    public int Page { get; set; }
+    public int PageSize { get; set; }
+    public int TotalPages => PageSize > 0 ? (int)Math.Ceiling((double)TotalCount / PageSize) : 0;
+    public bool HasNextPage => Page < TotalPages;
+    public bool HasPreviousPage => Page > 1;
+}
+

@@ -1,4 +1,4 @@
-﻿using VehicleService.Domain.Common;
+using VehicleService.Domain.Common;
 using VehicleService.Domain.Enums;
 
 namespace VehicleService.Domain.Entities;
@@ -76,6 +76,9 @@ public class ServiceJobCard : BaseEntity
     public string? MechanicNotes { get; set; }
     public string? QualityCheckNotes { get; set; }
     public string? Recommendations { get; set; }
+
+    // Concurrency Token
+    public byte[]? RowVersion { get; set; }
 
     public virtual VehicleInspection? Inspection { get; set; }
     public virtual ICollection<RepairEstimate> RepairEstimates { get; set; } = new List<RepairEstimate>();

@@ -14,6 +14,8 @@ public static class DependencyInjection
     public static IServiceCollection AddInfrastructureServices(this IServiceCollection services, IConfiguration configuration)
     {
         // Infrastructure External Services
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<IPaymentService, MockPaymentService>();
         services.AddSingleton<IBlobStorageService, LocalBlobStorageService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();

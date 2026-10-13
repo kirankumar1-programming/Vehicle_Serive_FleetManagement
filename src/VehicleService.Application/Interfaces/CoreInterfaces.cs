@@ -156,6 +156,8 @@ public interface IAuditService
 {
     Task LogAsync(string? userId, string? userName, string action, string entityName, string? entityId, string? oldValues, string? newValues);
     Task<IReadOnlyList<AuditLogDto>> GetLogsAsync(int take = 100);
+    Task<PagedResult<AuditLogDto>> GetFilteredLogsAsync(AuditLogFilterDto filter);
+    Task<AuditLogDto?> GetLogByIdAsync(int id);
 }
 
 public interface INotificationService

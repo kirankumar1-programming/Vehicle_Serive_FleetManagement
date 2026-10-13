@@ -8,6 +8,9 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
+        // Concurrency Coordination
+        services.AddSingleton<VehicleService.Application.Common.IConcurrencyCoordinator, VehicleService.Application.Common.KeyedLockCoordinator>();
+
         // Core Business Operations
         services.AddScoped<IVehicleService, VehicleManagementService>();
         services.AddScoped<IAppointmentService, AppointmentService>();

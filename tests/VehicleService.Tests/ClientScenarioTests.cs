@@ -1260,6 +1260,11 @@ public class ClientScenarioTests : IDisposable
             .Options;
 
         using var context = new ApplicationDbContext(options);
+        try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE ServiceJobCards ADD COLUMN RowVersion BLOB;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE Invoices ADD COLUMN RowVersion BLOB;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE ServiceAppointments ADD COLUMN RowVersion BLOB;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync("ALTER TABLE InventoryParts ADD COLUMN RowVersion BLOB;"); } catch { }
+
         var targetCard = await context.ServiceJobCards
             .Include(j => j.Appointment)
             .FirstOrDefaultAsync(j => j.JobCardNumber == "JC-20261001-BB2AC" || j.Id == 8);

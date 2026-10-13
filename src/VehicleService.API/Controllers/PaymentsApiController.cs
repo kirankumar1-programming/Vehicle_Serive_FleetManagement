@@ -14,10 +14,12 @@ namespace VehicleService.API.Controllers;
 public class PaymentsApiController : ControllerBase
 {
     private readonly IPaymentService _paymentService;
+    private readonly ILogger<PaymentsApiController> _logger;
 
-    public PaymentsApiController(IPaymentService paymentService)
+    public PaymentsApiController(IPaymentService paymentService, ILogger<PaymentsApiController> logger)
     {
         _paymentService = paymentService;
+        _logger = logger;
     }
 
     [HttpPost]
@@ -26,7 +28,14 @@ public class PaymentsApiController : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
+        _logger.LogInformation("Processing payment for Invoice {InvoiceId}, Amount {Amount}, Method {Method}",
+            dto.InvoiceId, dto.Amount, dto.Method);
+
         var result = await _paymentService.ProcessPaymentAsync(dto);
+
+        _logger.LogInformation("Payment for Invoice {InvoiceId} finished with Status: {Status}, Ref: {Ref}",
+            dto.InvoiceId, result.Status, result.TransactionReference);
+
         return Ok(result);
     }
 

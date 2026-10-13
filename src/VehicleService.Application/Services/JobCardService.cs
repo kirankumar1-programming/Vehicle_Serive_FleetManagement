@@ -11,11 +11,19 @@ public class JobCardService : IJobCardService
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
+    private readonly VehicleService.Application.Common.IConcurrencyCoordinator _concurrencyCoordinator;
+    private readonly IInventoryService _inventoryService;
 
-    public JobCardService(IUnitOfWork unitOfWork, INotificationService notificationService)
+    public JobCardService(
+        IUnitOfWork unitOfWork,
+        INotificationService notificationService,
+        VehicleService.Application.Common.IConcurrencyCoordinator? concurrencyCoordinator = null,
+        IInventoryService? inventoryService = null)
     {
         _unitOfWork = unitOfWork;
         _notificationService = notificationService;
+        _concurrencyCoordinator = concurrencyCoordinator ?? new VehicleService.Application.Common.KeyedLockCoordinator();
+        _inventoryService = inventoryService ?? new InventoryService(_unitOfWork, _concurrencyCoordinator);
     }
 
     public async Task<IReadOnlyList<JobCardDto>> GetJobCardsAsync(AppointmentStatus? status = null, int? centerId = null)
@@ -183,7 +191,7 @@ public class JobCardService : IJobCardService
             }
         }
 
-        // Apply reservations and update inventory stock counters
+        // Apply reservations and update inventory stock counters via InventoryService
         foreach (var partId in targetPartIds.Distinct())
         {
             var alreadyReserved = await _unitOfWork.Repository<PartReservation>().Query()
@@ -191,83 +199,77 @@ public class JobCardService : IJobCardService
 
             if (!alreadyReserved)
             {
-                var part = await _unitOfWork.Repository<InventoryPart>().GetByIdAsync(partId);
-                if (part != null && part.AvailableQuantity > 0)
+                try
                 {
-                    int beforeAvail = part.AvailableQuantity;
-                    part.AvailableQuantity -= 1;
-                    part.ReservedQuantity += 1;
-                    await _unitOfWork.Repository<InventoryPart>().UpdateAsync(part);
-
-                    await _unitOfWork.Repository<PartReservation>().AddAsync(new PartReservation
-                    {
-                        InventoryPartId = partId,
-                        AppointmentId = appointmentId,
-                        Quantity = 1,
-                        IsReleased = false
-                    });
-
-                    await _unitOfWork.Repository<InventoryTransaction>().AddAsync(new InventoryTransaction
-                    {
-                        InventoryPartId = part.Id,
-                        TransactionType = InventoryTransactionType.Reservation,
-                        Quantity = 1,
-                        QuantityBefore = beforeAvail,
-                        QuantityAfter = part.AvailableQuantity,
-                        UnitCost = part.CostPrice,
-                        TotalAmount = part.CostPrice,
-                        ReferenceNumber = jobCardNumber,
-                        Notes = $"Stock reserved upon Job Card {jobCardNumber} creation"
-                    });
+                    await _inventoryService.ReservePartAsync(partId, 1, appointmentId);
+                }
+                catch (InsufficientStockException)
+                {
+                    // Stock unavailable for auto-detected part, continue with remaining
                 }
             }
         }
 
-        await _unitOfWork.SaveChangesAsync();
-
         return (await GetJobCardByIdAsync(jobCard.Id))!;
     }
 
-    // SCENARIO 6: Mechanic Availability Validation
+    // SCENARIO 6: Mechanic Availability Validation with Concurrency Lock
     public async Task AssignMechanicAsync(int jobCardId, string mechanicId)
     {
-        var jobCard = await _unitOfWork.Repository<ServiceJobCard>().Query()
-            .Include(j => j.Appointment)
-            .FirstOrDefaultAsync(j => j.Id == jobCardId);
-        if (jobCard == null) throw new DomainException("Job Card not found.");
-
-        if (jobCard.Status == AppointmentStatus.Cancelled || jobCard.Appointment?.Status == AppointmentStatus.Cancelled)
+        var lockKey = $"mechanic:assign:{mechanicId}";
+        using (await _concurrencyCoordinator.LockAsync(lockKey))
         {
-            throw new DomainException("Cannot assign mechanic to a cancelled job card.");
+            var jobCard = await _unitOfWork.Repository<ServiceJobCard>().Query()
+                .Include(j => j.Appointment)
+                .FirstOrDefaultAsync(j => j.Id == jobCardId);
+            if (jobCard == null) throw new DomainException("Job Card not found.");
+
+            if (jobCard.Status == AppointmentStatus.Cancelled || jobCard.Appointment?.Status == AppointmentStatus.Cancelled)
+            {
+                throw new DomainException("Cannot assign mechanic to a cancelled job card.");
+            }
+            if (jobCard.Status == AppointmentStatus.Completed)
+            {
+                throw new DomainException("Cannot assign mechanic to a completed job card.");
+            }
+
+            // Check if mechanic is already engaged in active, in-progress jobs
+            var activeJobs = await _unitOfWork.Repository<ServiceJobCard>().Query()
+                .Where(j => j.MechanicId == mechanicId &&
+                            j.Id != jobCardId &&
+                            (j.Status == AppointmentStatus.InProgress || j.Status == AppointmentStatus.UnderInspection))
+                .ToListAsync();
+
+            // Enforce maximum concurrent active job policy (e.g. max 2 concurrent jobs in workshop)
+            if (activeJobs.Count >= 2)
+            {
+                throw new MechanicUnavailableException($"Mechanic is currently occupied with {activeJobs.Count} active repair jobs ({string.Join(", ", activeJobs.Select(j => j.JobCardNumber))}). Please complete an existing job or assign an available mechanic.");
+            }
+
+            jobCard.MechanicId = mechanicId;
+            await _unitOfWork.Repository<ServiceJobCard>().UpdateAsync(jobCard);
+
+            try
+            {
+                await _unitOfWork.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                var refreshed = await _unitOfWork.Repository<ServiceJobCard>().GetByIdAsync(jobCardId);
+                if (refreshed == null || refreshed.Status == AppointmentStatus.Completed || refreshed.Status == AppointmentStatus.Cancelled)
+                {
+                    throw new DomainException("Job Card status was modified concurrently.");
+                }
+                throw;
+            }
+
+            await _notificationService.SendNotificationAsync(
+                mechanicId,
+                "New Job Assigned",
+                $"You have been assigned to Job Card {jobCard.JobCardNumber}.",
+                NotificationType.JobProgress,
+                $"/Mechanic/JobDetails/{jobCardId}");
         }
-        if (jobCard.Status == AppointmentStatus.Completed)
-        {
-            throw new DomainException("Cannot assign mechanic to a completed job card.");
-        }
-
-        // Check if mechanic is already engaged in an active, in-progress job
-        var activeJobs = await _unitOfWork.Repository<ServiceJobCard>().Query()
-            .Where(j => j.MechanicId == mechanicId &&
-                        j.Id != jobCardId &&
-                        (j.Status == AppointmentStatus.InProgress || j.Status == AppointmentStatus.UnderInspection))
-            .ToListAsync();
-
-        // Enforce maximum concurrent active job policy (e.g. max 2 concurrent jobs in workshop)
-        if (activeJobs.Count >= 2)
-        {
-            throw new MechanicUnavailableException($"Mechanic is currently occupied with {activeJobs.Count} active repair jobs ({string.Join(", ", activeJobs.Select(j => j.JobCardNumber))}). Please complete an existing job or assign an available mechanic.");
-        }
-
-        jobCard.MechanicId = mechanicId;
-        await _unitOfWork.Repository<ServiceJobCard>().UpdateAsync(jobCard);
-        await _unitOfWork.SaveChangesAsync();
-
-        await _notificationService.SendNotificationAsync(
-            mechanicId,
-            "New Job Assigned",
-            $"You have been assigned to Job Card {jobCard.JobCardNumber}.",
-            NotificationType.JobProgress,
-            $"/Mechanic/JobDetails/{jobCardId}");
     }
 
     public async Task UpdateJobCardStatusAsync(int jobCardId, AppointmentStatus newStatus, string? notes = null)
