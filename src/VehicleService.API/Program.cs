@@ -12,18 +12,27 @@ using VehicleService.Application;
 using VehicleService.Domain.Constants;
 using VehicleService.Domain.Entities;
 using VehicleService.Infrastructure;
+using VehicleService.Infrastructure.KeyVault;
+using VehicleService.Infrastructure.Storage;
+using VehicleService.Infrastructure.Telemetry;
 using VehicleService.Persistence;
 using VehicleService.Persistence.Context;
 using VehicleService.Persistence.Seed;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// 0. Azure Key Vault Secret Configuration Provider
+builder.Configuration.AddAzureKeyVaultIfConfigured(builder.Configuration);
+
 // 1. Production Structured Logging Configuration
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
-// 2. Data Access Layer (Persistence)
+// 2. Azure Application Insights Observability
+builder.Services.AddAzureApplicationInsights(builder.Configuration, "VehicleService.API");
+
+// 3. Data Access Layer (Persistence)
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=VehicleService_Api.db";
 builder.Services.AddPersistenceServices(builder.Configuration, connectionString);
 
@@ -107,7 +116,8 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("Database", tags: new[] { "ready", "db" })
     .AddCheck<SystemMemoryHealthCheck>("Memory", tags: new[] { "ready", "memory" })
-    .AddCheck<DiskStorageHealthCheck>("Storage", tags: new[] { "ready", "storage" });
+    .AddCheck<DiskStorageHealthCheck>("Storage", tags: new[] { "ready", "storage" })
+    .AddCheck<AzureBlobStorageHealthCheck>("AzureBlobStorage", tags: new[] { "ready", "storage", "azure" });
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

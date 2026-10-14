@@ -3,13 +3,18 @@ using VehicleService.Application;
 using VehicleService.Domain.Constants;
 using VehicleService.Domain.Entities;
 using VehicleService.Infrastructure;
+using VehicleService.Infrastructure.KeyVault;
+using VehicleService.Infrastructure.Telemetry;
 using VehicleService.Persistence;
 using VehicleService.Persistence.Context;
 using VehicleService.Persistence.Seed;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Data Access Layer (Persistence)
+// 0. Azure Key Vault Secret Configuration Provider (loads secrets dynamically)
+builder.Configuration.AddAzureKeyVaultIfConfigured(builder.Configuration);
+
+// 1. Data Access Layer (Persistence - supports Azure SQL & SQLite)
 builder.Services.AddPersistenceServices(builder.Configuration);
 
 // 2. Identity & Hardened Cookie Authentication
@@ -57,10 +62,16 @@ builder.Services.AddAuthorization(options =>
 // 4. Business Logic Layer (Application)
 builder.Services.AddApplicationServices();
 
-// 5. Infrastructure Layer
+// 5. Infrastructure Layer (includes Azure Key Vault, Azure Blob Storage, LLM client)
 builder.Services.AddInfrastructureServices(builder.Configuration);
 
-// 6. Presentation Layer (Web MVC)
+// 6. Azure Application Insights Observability & Telemetry
+builder.Services.AddAzureApplicationInsights(builder.Configuration, "VehicleService.Web");
+
+// 7. Health Checks for Azure App Service Probes
+builder.Services.AddHealthChecks();
+
+// 8. Presentation Layer (Web MVC)
 builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
@@ -106,6 +117,11 @@ app.UseRouting();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Azure App Service Health Probe Endpoints
+app.MapHealthChecks("/health");
+app.MapHealthChecks("/health/live");
+app.MapHealthChecks("/health/ready");
 
 app.MapControllerRoute(
     name: "default",

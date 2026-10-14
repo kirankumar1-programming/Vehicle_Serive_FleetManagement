@@ -1,4 +1,4 @@
-# Enterprise Vehicle Service & Fleet Management System
+ï»¿# Enterprise Vehicle Service & Fleet Management System
 
 A production-grade, enterprise-ready **Vehicle Service & Fleet Management System** built with **ASP.NET Core (net10.0)**, adhering strictly to **Clean Architecture** and Domain-Driven Design (DDD) principles.
 
@@ -26,14 +26,14 @@ The solution is divided into 7 decoupled layers following Clean Architecture:
 ```
 VehicleServiceFleetManagement/
 +-- src/
-¦   +-- VehicleService.Domain/          # Enterprise domain entities, enums, exceptions, business rules
-¦   +-- VehicleService.Application/     # Application services, DTOs, repository interfaces, business workflows
-¦   +-- VehicleService.Persistence/     # EF Core ApplicationDbContext, Fluent API mappings, Seeder, UnitOfWork
-¦   +-- VehicleService.Infrastructure/  # Background services, Payment gateway mock, Blob storage, JWT token generator
-¦   +-- VehicleService.API/             # RESTful API controllers, JWT authentication, Swagger OpenAPI documentation
-¦   +-- VehicleService.Web/             # ASP.NET Core MVC, Razor Views, Bootstrap 5 UI, 1-Click Role Switcher
+ï¿½   +-- VehicleService.Domain/          # Enterprise domain entities, enums, exceptions, business rules
+ï¿½   +-- VehicleService.Application/     # Application services, DTOs, repository interfaces, business workflows
+ï¿½   +-- VehicleService.Persistence/     # EF Core ApplicationDbContext, Fluent API mappings, Seeder, UnitOfWork
+ï¿½   +-- VehicleService.Infrastructure/  # Background services, Payment gateway mock, Blob storage, JWT token generator
+ï¿½   +-- VehicleService.API/             # RESTful API controllers, JWT authentication, Swagger OpenAPI documentation
+ï¿½   +-- VehicleService.Web/             # ASP.NET Core MVC, Razor Views, Bootstrap 5 UI, 1-Click Role Switcher
 +-- tests/
-¦   +-- VehicleService.Tests/           # Comprehensive xUnit & FluentAssertions test suite for all 7 scenarios
+ï¿½   +-- VehicleService.Tests/           # Comprehensive xUnit & FluentAssertions test suite for all 7 scenarios
 +-- .github/workflows/deploy.yml        # GitHub Actions CI/CD pipeline
 +-- azure-pipelines.yml                 # Azure DevOps CI/CD pipeline
 +-- Dockerfile                          # Multi-stage production container build
@@ -55,13 +55,13 @@ The system provides 7 dedicated operational portals:
 
 | Role | Portal Capabilities |
 | :--- | :--- |
-| **?? Customer** | • **Digital Garage**: Register multiple private vehicles (Make, Model, VIN, Plate, Fuel Type, Mileage)<br>• **Booking Wizard**: Choose service center, bay, service packages, and preferred time slot<br>• **Live Servicing Tracker**: Real-time progress bar from intake to delivery<br>• **Estimate Approval**: Review itemized parts & labor costs, 1-click Approve or Reject<br>• **Invoicing & Payments**: View breakdowns with GST, pay via Mock Payment Gateway, download PDF invoices<br>• **Warranties & Roadside Assistance**: View active warranties, request emergency 24/7 SOS rescue with GPS location<br>• **Feedback**: Submit ratings, reviews, and service complaints |
-| **????? Service Advisor** | • **Intake Desk**: Manage incoming vehicle appointments and create new walk-in requests<br>• **40-Point Digital Inspection**: Conduct inspection checklists with status flags (Pass/Attention/Fail)<br>• **Job Card Generation**: Convert appointments to active workshop job cards and assign mechanics<br>• **Line-Item Estimate Builder**: Prepare additional repair estimates with parts and labor quotes |
-| **?? Mechanic** | • **Workshop Workbench**: View assigned jobs and vehicle service checklists<br>• **Work Progress Logging**: Update status (In Inspection, In Progress, In Quality Check, Completed)<br>• **Parts & Labor Consumption**: Record actual parts used from inventory and log precise labor hours |
-| **?? Inventory Manager** | • **Spare Parts Catalog**: Manage SKUs, categories, unit prices, minimum thresholds, and bins<br>• **Stock Movement Ledger**: Track GRNs (Goods Received Notes), issues, and returns<br>• **Concurrency Stock Control**: Prevent overselling and enforce non-negative inventory thresholds<br>• **Low-Stock Alerts**: Real-time dashboard warnings when stock dips below reorder points |
-| **?? Finance Manager** | • **Billing & Invoicing**: Generate automated tax invoices with itemized parts & labor charges<br>• **Mock Payment Processing**: Handle online payments with duplicate callback idempotency<br>• **Refund Management**: Process authorized partial or full refunds<br>• **Revenue Analytics**: Daily/monthly revenue, pending collections, and tax summaries |
-| **?? Fleet Manager** | • **Corporate Fleet Registry**: Manage commercial trucks, vans, and passenger vehicles<br>• **Driver Allocation**: Assign drivers to vehicles with license verification<br>• **Preventive Maintenance**: Configure mileage and time-interval based servicing schedules<br>• **Fleet Cost Analytics**: Track vehicle maintenance expenditure, downtime hours, and cost-per-km |
-| **?? Administrator** | • **Master KPIs**: Workshop revenue, active jobs, customer retention, bay utilization<br>• **Multi-Center & Bay Management**: Configure physical service centers, operating bays, and capacities<br>• **Catalog & Coupon Management**: Define standard service packages, pricing, and discount promo codes<br>• **User RBAC & Audit Trails**: Manage user roles and inspect security/system audit logs<br>• **Review Moderation**: Moderate customer reviews and complaints |
+| **?? Customer** | ï¿½ **Digital Garage**: Register multiple private vehicles (Make, Model, VIN, Plate, Fuel Type, Mileage)<br>ï¿½ **Booking Wizard**: Choose service center, bay, service packages, and preferred time slot<br>ï¿½ **Live Servicing Tracker**: Real-time progress bar from intake to delivery<br>ï¿½ **Estimate Approval**: Review itemized parts & labor costs, 1-click Approve or Reject<br>ï¿½ **Invoicing & Payments**: View breakdowns with GST, pay via Mock Payment Gateway, download PDF invoices<br>ï¿½ **Warranties & Roadside Assistance**: View active warranties, request emergency 24/7 SOS rescue with GPS location<br>ï¿½ **Feedback**: Submit ratings, reviews, and service complaints |
+| **????? Service Advisor** | ï¿½ **Intake Desk**: Manage incoming vehicle appointments and create new walk-in requests<br>ï¿½ **40-Point Digital Inspection**: Conduct inspection checklists with status flags (Pass/Attention/Fail)<br>ï¿½ **Job Card Generation**: Convert appointments to active workshop job cards and assign mechanics<br>ï¿½ **Line-Item Estimate Builder**: Prepare additional repair estimates with parts and labor quotes |
+| **?? Mechanic** | ï¿½ **Workshop Workbench**: View assigned jobs and vehicle service checklists<br>ï¿½ **Work Progress Logging**: Update status (In Inspection, In Progress, In Quality Check, Completed)<br>ï¿½ **Parts & Labor Consumption**: Record actual parts used from inventory and log precise labor hours |
+| **?? Inventory Manager** | ï¿½ **Spare Parts Catalog**: Manage SKUs, categories, unit prices, minimum thresholds, and bins<br>ï¿½ **Stock Movement Ledger**: Track GRNs (Goods Received Notes), issues, and returns<br>ï¿½ **Concurrency Stock Control**: Prevent overselling and enforce non-negative inventory thresholds<br>ï¿½ **Low-Stock Alerts**: Real-time dashboard warnings when stock dips below reorder points |
+| **?? Finance Manager** | ï¿½ **Billing & Invoicing**: Generate automated tax invoices with itemized parts & labor charges<br>ï¿½ **Mock Payment Processing**: Handle online payments with duplicate callback idempotency<br>ï¿½ **Refund Management**: Process authorized partial or full refunds<br>ï¿½ **Revenue Analytics**: Daily/monthly revenue, pending collections, and tax summaries |
+| **?? Fleet Manager** | ï¿½ **Corporate Fleet Registry**: Manage commercial trucks, vans, and passenger vehicles<br>ï¿½ **Driver Allocation**: Assign drivers to vehicles with license verification<br>ï¿½ **Preventive Maintenance**: Configure mileage and time-interval based servicing schedules<br>ï¿½ **Fleet Cost Analytics**: Track vehicle maintenance expenditure, downtime hours, and cost-per-km |
+| **?? Administrator** | ï¿½ **Master KPIs**: Workshop revenue, active jobs, customer retention, bay utilization<br>ï¿½ **Multi-Center & Bay Management**: Configure physical service centers, operating bays, and capacities<br>ï¿½ **Catalog & Coupon Management**: Define standard service packages, pricing, and discount promo codes<br>ï¿½ **User RBAC & Audit Trails**: Manage user roles and inspect security/system audit logs<br>ï¿½ **Review Moderation**: Moderate customer reviews and complaints |
 
 ---
 
@@ -161,19 +161,43 @@ The system runs three autonomous background services (`IHostedService` / `Backgr
 
 ## Cloud, Azure & Container Deployment
 
-### Azure Services Ready
-- **Azure App Service**: Deployable as a Linux or Windows container web app.
-- **Azure SQL Database**: Set `"UseSqlite": false` and configure `"ConnectionStrings:DefaultConnection"` with your Azure SQL connection string.
-- **Azure Blob Storage**: Switch from `LocalBlobStorageService` to Azure Blob Storage SDK by providing `"AzureBlobStorage:ConnectionString"`.
-- **Azure Key Vault**: Ready for Secret Management and environment variable injection in production.
-- **Application Insights**: Pre-configured telemetry for request monitoring, exception tracking, and performance logging.
+### Enterprise Azure Architecture
 
-### DevOps CI/CD
-- **Azure Pipelines**: Configured in [`azure-pipelines.yml`](azure-pipelines.yml) (Build, test, package, and publish drop artifact).
-- **GitHub Actions**: Configured in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) (Automatic validation on PRs and main branch).
-- **Docker**: [`Dockerfile`](Dockerfile) multi-stage container build + [`docker-compose.yml`](docker-compose.yml) for 1-command startup.
+The solution includes enterprise-grade native integrations for Microsoft Azure:
 
----
+- **Azure Key Vault**:
+  - Implemented via Azure.Security.KeyVault.Secrets, Azure.Identity, and Azure.Extensions.AspNetCore.Configuration.Secrets.
+  - Integrates with ASP.NET Core IConfiguration with automatic 15-minute background reload.
+  - Supports DefaultAzureCredential (Azure Managed Identity in App Service, AKS, Container Apps, or Azure CLI) and Service Principal credentials.
+  - Injected via IKeyVaultSecretService with automatic local fallback for zero-friction local development.
+- **Azure Application Insights & OpenTelemetry**:
+  - Implemented via Microsoft.ApplicationInsights.AspNetCore (OpenTelemetry-powered 3.x architecture).
+  - Automatically tags cloud role names (VehicleService.Web, VehicleService.API), machine instances, and environments.
+  - Full end-to-end dependency tracking: incoming HTTP requests, outgoing HTTP calls (LLM client), and Azure SQL command execution.
+- **Azure SQL Database**:
+  - Implemented via Microsoft.EntityFrameworkCore.SqlServer with auto-detection for Azure SQL connection strings (database.windows.net).
+  - Configured with transient error retry policies (EnableRetryOnFailure(maxRetryCount: 6, maxRetryDelay: 30s)), custom command timeouts, and connection pooling.
+  - Automatic fallback to SQLite for local development and offline environments.
+- **Azure Blob Storage**:
+  - Implemented via Azure.Storage.Blobs for cloud attachments, inspection photos, invoices, and documents.
+  - Supports Managed Identity (AzureBlobStorage:ServiceUri) and connection strings (AzureBlobStorage:ConnectionString).
+  - Auto-provisions the ehicle-attachments container with public blob read access.
+  - Monitored by AzureBlobStorageHealthCheck with automatic fallback to LocalBlobStorageService.
+- **Infrastructure as Code (Azure Bicep)**:
+  - Production templates in [zure/main.bicep](azure/main.bicep) and [zure/main.bicepparam](azure/main.bicepparam).
+  - Provisions Key Vault with RBAC, Azure SQL Server & Database, Azure Storage Account, Log Analytics, Application Insights, App Service Plan, and Web App with a staging slot.
+  - Automatically assigns Key Vault Secrets User and Storage Blob Data Contributor RBAC roles to the Web App's Managed Identity.
+
+### DevOps CI/CD Pipelines
+- **Azure DevOps Pipelines ([zure-pipelines.yml](azure-pipelines.yml))**:
+  - **Stage 1 (BuildAndTest)**: .NET 10 SDK setup, NuGet caching, build, xUnit test execution with TRX test results and Cobertura code coverage publishing, and packaging for Web and API.
+  - **Stage 2 (ValidateInfrastructure)**: Bicep template validation and linting with Azure CLI.
+  - **Stage 3 (DeployToStaging)**: Zero-downtime deployment to the App Service staging slot with automated /health/ready smoke test probes.
+  - **Stage 4 (PromoteToProduction)**: Seamless Azure App Service slot swap (staging -> production) with post-swap /health validation.
+- **GitHub Actions ([.github/workflows/main_vehicleservicemanagement.yml](.github/workflows/main_vehicleservicemanagement.yml))**:
+  - Automated PR and push validation with .NET 10 caching, build, test execution, TRX test result artifact upload, and Azure Web App deployment with health probe verification.
+- **Docker**: Multi-stage [Dockerfile](Dockerfile) + [docker-compose.yml](docker-compose.yml) for immediate local containerization.
+
 
 ## Quick Start Guide
 

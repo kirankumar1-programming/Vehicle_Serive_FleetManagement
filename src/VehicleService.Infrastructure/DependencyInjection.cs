@@ -4,6 +4,7 @@ using VehicleService.Application;
 using VehicleService.Application.Interfaces;
 using VehicleService.Infrastructure.Auth;
 using VehicleService.Infrastructure.BackgroundServices;
+using VehicleService.Infrastructure.KeyVault;
 using VehicleService.Infrastructure.Payment;
 using VehicleService.Infrastructure.Storage;
 
@@ -17,8 +18,17 @@ public static class DependencyInjection
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<IPaymentService, MockPaymentService>();
-        services.AddSingleton<IBlobStorageService, LocalBlobStorageService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
+
+        // Azure Key Vault Integration
+        services.Configure<AzureKeyVaultOptions>(configuration.GetSection(AzureKeyVaultOptions.SectionName));
+        services.AddSingleton<IKeyVaultSecretService, AzureKeyVaultSecretService>();
+
+        // Azure Blob Storage Integration with Local Fallback
+        services.Configure<AzureBlobStorageOptions>(configuration.GetSection(AzureBlobStorageOptions.SectionName));
+        services.AddSingleton<AzureBlobStorageService>();
+        services.AddSingleton<IBlobStorageService>(sp => sp.GetRequiredService<AzureBlobStorageService>());
+        services.AddSingleton<AzureBlobStorageHealthCheck>();
 
         // AI & External LLM Services
         services.Configure<Ai.LlmSettings>(configuration.GetSection(Ai.LlmSettings.SectionName));

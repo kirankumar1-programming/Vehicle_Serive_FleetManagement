@@ -3,6 +3,16 @@ trigger:
     include:
       - main
       - master
+  paths:
+    exclude:
+      - 'README.md'
+      - '.gitignore'
+
+pr:
+  branches:
+    include:
+      - main
+      - master
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -10,53 +20,232 @@ pool:
 variables:
   buildConfiguration: 'Release'
   dotnetSdkVersion: '10.0.x'
+  azureSubscription: 'Azure-VehicleService-ServiceConnection'
+  azureResourceGroup: 'rg-vehicleservice-prod'
+  webAppName: 'VehicleServiceManagement'
+  stagingSlotName: 'staging'
+  nuGetPackagesFolder: $(Pipeline.Workspace)/.nuget/packages
 
 stages:
+# ==============================================================================
+# STAGE 1: Build, Test & Package
+# ==============================================================================
 - stage: BuildAndTest
-  displayName: 'Build and Test Stage'
+  displayName: 'Build, Test & Package'
   jobs:
   - job: Build
-    displayName: 'Compile, Run Tests & Package'
+    displayName: 'Compile, Run Tests & Package Artifacts'
     steps:
     - task: UseDotNet@2
-      displayName: 'Install .NET SDK'
+      displayName: 'Install .NET 10 SDK'
       inputs:
         packageType: 'sdk'
         version: $(dotnetSdkVersion)
+
+    - task: Cache@2
+      displayName: 'Cache NuGet Packages'
+      inputs:
+        key: 'nuget | "$(Agent.OS)" | **/packages.lock.json, **/*.csproj'
+        restoreKeys: |
+          nuget | "$(Agent.OS)"
+        path: $(nuGetPackagesFolder)
 
     - task: DotNetCoreCLI@2
       displayName: 'Restore NuGet Packages'
       inputs:
         command: 'restore'
-        projects: '**/*.csproj'
+        projects: 'VehicleService.sln'
 
     - task: DotNetCoreCLI@2
-      displayName: 'Build with dotnet'
+      displayName: 'Build Solution'
       inputs:
         command: 'build'
-        projects: '**/*.csproj'
+        projects: 'VehicleService.sln'
         arguments: '--configuration $(buildConfiguration) --no-restore'
 
     - task: DotNetCoreCLI@2
-      displayName: 'Run Unit & Scenario Tests'
+      displayName: 'Run Unit & Scenario Tests with Code Coverage'
       inputs:
         command: 'test'
         projects: 'tests/VehicleService.Tests/VehicleService.Tests.csproj'
-        arguments: '--configuration $(buildConfiguration) --no-build --logger trx'
-        publishTestResults: true
+        arguments: '--configuration $(buildConfiguration) --no-build --logger trx --collect:"XPlat Code Coverage"'
+        publishTestResults: false
 
+    - task: PublishTestResults@2
+      displayName: 'Publish Test Results (TRX)'
+      condition: succeededOrFailed()
+      inputs:
+        testResultsFormat: 'VSTest'
+        testResultsFiles: '**/*.trx'
+        searchFolder: '$(Agent.TempDirectory)'
+        failTaskOnFailedTests: true
+
+    - task: PublishCodeCoverageResults@2
+      displayName: 'Publish Code Coverage Results'
+      condition: succeededOrFailed()
+      inputs:
+        summaryFileLocation: '$(Agent.TempDirectory)/**/coverage.cobertura.xml'
+
+    # Publish VehicleService.Web
     - task: DotNetCoreCLI@2
-      displayName: 'dotnet publish'
+      displayName: 'Publish VehicleService.Web'
       inputs:
         command: 'publish'
         publishWebProjects: false
         projects: 'src/VehicleService.Web/VehicleService.Web.csproj'
-        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/publish'
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/publish-web'
         zipAfterPublish: true
 
-    - task: PublishBuildArtifacts@1
-      displayName: 'Publish Build Artifacts'
+    # Publish VehicleService.API
+    - task: DotNetCoreCLI@2
+      displayName: 'Publish VehicleService.API'
       inputs:
-        PathtoPublish: '$(Build.ArtifactStagingDirectory)/publish'
-        ArtifactName: 'drop'
-        publishLocation: 'Container'
+        command: 'publish'
+        publishWebProjects: false
+        projects: 'src/VehicleService.API/VehicleService.API.csproj'
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/publish-api'
+        zipAfterPublish: true
+
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish Web Application Drop Artifact'
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)/publish-web'
+        artifact: 'web-drop'
+        publishLocation: 'pipeline'
+
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish API Application Drop Artifact'
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)/publish-api'
+        artifact: 'api-drop'
+        publishLocation: 'pipeline'
+
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish Infrastructure Bicep Templates'
+      inputs:
+        targetPath: 'azure'
+        artifact: 'infrastructure'
+        publishLocation: 'pipeline'
+
+# ==============================================================================
+# STAGE 2: Validate Infrastructure (Bicep IaC)
+# ==============================================================================
+- stage: ValidateInfrastructure
+  displayName: 'Validate Azure Infrastructure (Bicep)'
+  dependsOn: BuildAndTest
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - job: ValidateBicep
+    displayName: 'Lint & Validate Bicep Template'
+    steps:
+    - task: DownloadPipelineArtifact@2
+      displayName: 'Download Infrastructure Artifacts'
+      inputs:
+        artifact: 'infrastructure'
+        path: '$(Pipeline.Workspace)/infrastructure'
+
+    - task: AzureCLI@2
+      displayName: 'Validate Bicep Syntax with Azure CLI'
+      inputs:
+        azureSubscription: $(azureSubscription)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          az bicep build --file $(Pipeline.Workspace)/infrastructure/main.bicep
+          echo "Bicep template compiled and validated successfully."
+
+# ==============================================================================
+# STAGE 3: Deploy to Staging Slot & Verify Health
+# ==============================================================================
+- stage: DeployToStaging
+  displayName: 'Deploy to Staging Slot'
+  dependsOn: ValidateInfrastructure
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - deployment: DeployWebStaging
+    displayName: 'Deploy Web App to Staging Slot'
+    environment: 'VehicleService-Staging'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadPipelineArtifact@2
+            displayName: 'Download Web App Artifact'
+            inputs:
+              artifact: 'web-drop'
+              path: '$(Pipeline.Workspace)/web-drop'
+
+          - task: AzureWebApp@1
+            displayName: 'Deploy Package to Staging Slot'
+            inputs:
+              azureSubscription: $(azureSubscription)
+              appType: 'webApp'
+              appName: $(webAppName)
+              deployToSlotOrASE: true
+              resourceGroupName: $(azureResourceGroup)
+              slotName: $(stagingSlotName)
+              package: '$(Pipeline.Workspace)/web-drop/*.zip'
+
+          - task: AzureCLI@2
+            displayName: 'Smoke Test Staging Slot Health Probe'
+            inputs:
+              azureSubscription: $(azureSubscription)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                STAGING_URL="https://$(webAppName)-$(stagingSlotName).azurewebsites.net/health/ready"
+                echo "Probing staging endpoint: $STAGING_URL"
+                MAX_RETRIES=5
+                COUNT=0
+                until curl --silent --fail --output /dev/null "$STAGING_URL" || [ $COUNT -eq $MAX_RETRIES ]; do
+                  echo "Staging slot warming up, retrying in 10s... ($COUNT/$MAX_RETRIES)"
+                  sleep 10
+                  COUNT=$((COUNT + 1))
+                done
+                if [ $COUNT -eq $MAX_RETRIES ]; then
+                  echo "Staging health probe failed!"
+                  exit 1
+                fi
+                echo "Staging slot is healthy and responding successfully."
+
+# ==============================================================================
+# STAGE 4: Zero-Downtime Slot Swap to Production
+# ==============================================================================
+- stage: PromoteToProduction
+  displayName: 'Swap Staging Slot to Production'
+  dependsOn: DeployToStaging
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - deployment: SwapSlots
+    displayName: 'Swap Slots & Post-Swap Smoke Test'
+    environment: 'VehicleService-Production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureAppServiceManage@0
+            displayName: 'Swap Staging Slot with Production'
+            inputs:
+              azureSubscription: $(azureSubscription)
+              Action: 'Swap Slots'
+              WebAppName: $(webAppName)
+              ResourceGroupName: $(azureResourceGroup)
+              SourceSlot: $(stagingSlotName)
+              SwapWithProduction: true
+
+          - task: AzureCLI@2
+            displayName: 'Verify Production Live Health Probe'
+            inputs:
+              azureSubscription: $(azureSubscription)
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                PROD_URL="https://$(webAppName).azurewebsites.net/health"
+                echo "Probing production endpoint: $PROD_URL"
+                STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$PROD_URL" || true)
+                echo "Production HTTP status: $STATUS"
+                if [ "$STATUS" -ne 200 ]; then
+                  echo "Production health check failed with status $STATUS"
+                  exit 1
+                fi
+                echo "Production slot swap completed and validated successfully!"
